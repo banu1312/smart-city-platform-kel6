@@ -26,23 +26,23 @@ const registerProxyRoutes = (app) => {
 	const envUrl = process.env.ENV_SERVICE_URL || "http://localhost:8002";
 	const mlUrl = process.env.PYTHON_ML_URL || "http://localhost:5000";
 
-	// ── Citizen Service (port 8000) ──────────────────────
+	// Citizen Service (port 8000) 
 	app.use("/api/citizens", verifyJWT, makeProxy(citizenUrl));
 	app.use("/api/reports", verifyJWT, makeProxy(citizenUrl));
 	app.use("/api/notifications", verifyJWT, makeProxy(citizenUrl));
 
-	// ── Traffic Service (port 8001) ───────────────────────
+	// Traffic Service (port 8001)
 	app.use("/api/traffic", verifyJWT, makeProxy(trafficUrl));
 
-	// ── Environment Service (port 8002) ───────────────────
+	// Environment Service (port 8002)
 	app.use("/api/environment", verifyJWT, makeProxy(envUrl));
 
-	// ── Python ML Service (port 5000) ─────────────────────
+	// Python ML Service (port 5000)
 	app.use("/predict", verifyJWT, makeProxy(mlUrl));
 	app.use("/detect", verifyJWT, makeProxy(mlUrl));
 	app.use("/model", verifyJWT, makeProxy(mlUrl));
 
-	// ── IoT Routes — dari Node-RED, pakai client_credentials token ──
+	//  IoT Routes - dari Node-RED, pakai client_credentials token
 	app.use(
 		"/iot",
 		verifyIoTToken,
