@@ -2,20 +2,21 @@ const { createProxyMiddleware } = require("http-proxy-middleware");
 const { verifyJWT, verifyIoTToken } = require("../middleware/jwt");
 const { sendError } = require("../utils/response");
 
-/**
- * Buat proxy middleware dengan error handling bawaan.
- * Jika upstream service down, return 502 bukan crash.
- */
 const makeProxy = (target, pathRewrite = {}) => {
 	return createProxyMiddleware({
 		target,
 		changeOrigin: true,
 		pathRewrite,
-		on: {
-			error: (err, req, res) => {
-				console.error(`[Proxy Error] ${target}: ${err.message}`);
-				sendError(res, `Upstream service unavailable: ${target}`, 502);
-			},
+		onError: (err, req, res) => {
+			console.error(`[Proxy Error] ${target}: ${err.message}`);
+			res.status(502).json({
+				status: "error",
+				code: 502,
+				message: `Upstream service unavailable: ${target}`,
+				data: null,
+				service: "api-gateway",
+				timestamp: new Date().toISOString(),
+			});
 		},
 	});
 };
@@ -26,7 +27,7 @@ const registerProxyRoutes = (app) => {
 	const envUrl = process.env.ENV_SERVICE_URL || "http://localhost:8002";
 	const mlUrl = process.env.PYTHON_ML_URL || "http://localhost:5000";
 
-	// Citizen Service (port 8000) 
+	// Citizen Service (port 8000)
 	app.use("/api/citizens", verifyJWT, makeProxy(citizenUrl));
 	app.use("/api/reports", verifyJWT, makeProxy(citizenUrl));
 	app.use("/api/notifications", verifyJWT, makeProxy(citizenUrl));

@@ -1,5 +1,6 @@
 require("dotenv").config();
 const express = require("express");
+const axios = require("axios");
 const logger = require("./middleware/logger");
 const { registerProxyRoutes } = require("./routes/proxy");
 const { sendError } = require("./utils/response");
@@ -8,12 +9,9 @@ const app = express();
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-
-// logger
 app.use(logger);
 
-// Public endpoint: Health check 
-// (masih skeleton)
+// Health check (publik)
 app.get("/health", (req, res) => {
 	res.json({
 		status: "success",
@@ -25,21 +23,42 @@ app.get("/health", (req, res) => {
 	});
 });
 
-// Public endpoint: OAuth token (forward ke oauth-server) 
-const { createProxyMiddleware } = require("http-proxy-middleware");
+// Manual forward /oauth/ → OAuth Server
 const oauthUrl = process.env.OAUTH_SERVER_URL || "http://localhost:3002";
-app.use(
-	"/oauth",
-	createProxyMiddleware({
-		target: oauthUrl,
-		changeOrigin: true,
-		on: {
-			error: (err, req, res) => {
-				sendError(res, "OAuth Server unavailable", 503);
+
+app.use("/oauth", async (req, res) => {
+	try {
+		const targetUrl = `${oauthUrl}/oauth${req.path === "/" ? "" : req.path}`;
+
+		console.log(`[OAuth Forward] ${req.method} ${targetUrl}`);
+
+		const response = await axios({
+			method: req.method,
+			url: targetUrl,
+			headers: {
+				"Content-Type": req.headers["content-type"] || "application/json",
+				...(req.headers["authorization"] && {
+					Authorization: req.headers["authorization"],
+				}),
 			},
-		},
-	}),
-);
+			data: req.body,
+			timeout: 10000,
+		});
+
+		return res.status(response.status).json(response.data);
+	} catch (err) {
+		// Axios error — upstream tidak bisa dijangkau
+		if (err.code === "ECONNREFUSED" || err.code === "ENOTFOUND") {
+			return sendError(res, "OAuth Server unavailable", 503);
+		}
+		// OAuth Server balas dengan error (401, 400, dll) — teruskan ke client
+		if (err.response) {
+			return res.status(err.response.status).json(err.response.data);
+		}
+		console.error("[OAuth Forward Error]", err.message);
+		return sendError(res, "OAuth Server error", 500);
+	}
+});
 
 // Protected proxy routes
 registerProxyRoutes(app);
@@ -55,7 +74,6 @@ app.use((err, req, res, _next) => {
 	sendError(res, "Internal Gateway Error", 500);
 });
 
-// Start server
 const PORT = process.env.GATEWAY_PORT || 3000;
 app.listen(PORT, () => {
 	console.log(`[API Gateway] Running on port ${PORT}`);
@@ -63,7 +81,7 @@ app.listen(PORT, () => {
 	console.log(`  → Traffic  : ${process.env.TRAFFIC_SERVICE_URL}`);
 	console.log(`  → Env      : ${process.env.ENV_SERVICE_URL}`);
 	console.log(`  → Python ML: ${process.env.PYTHON_ML_URL}`);
-	console.log(`  → OAuth    : ${process.env.OAUTH_SERVER_URL}`);
+	console.log(`  → OAuth    : ${oauthUrl}`);
 });
 
 module.exports = app;
