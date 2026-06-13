@@ -1,0 +1,71 @@
+{
+	"id": "smartcity-local-env",
+	"name": "Smart City - Local",
+	"values": [
+		{
+			"key": "baseUrl",
+			"value": "http://localhost:3000",
+			"type": "default",
+			"enabled": true,
+			"description": "API Gateway URL (Sprint 1: lokal, Sprint 3: server kampus)"
+		},
+		{
+			"key": "oauthUrl",
+			"value": "http://localhost:3002",
+			"type": "default",
+			"enabled": true,
+			"description": "OAuth Server URL langsung (untuk test tanpa Gateway)"
+		},
+		{
+			"key": "clientId",
+			"value": "smartcity-app",
+			"type": "default",
+			"enabled": true,
+			"description": "OAuth Client ID untuk citizen app"
+		},
+		{
+			"key": "clientSecret",
+			"value": "smartcity-secret",
+			"type": "default",
+			"enabled": true,
+			"description": "OAuth Client Secret untuk citizen app"
+		},
+		{
+			"key": "accessToken",
+			"value": "",
+			"type": "default",
+			"enabled": true,
+			"description": "Diisi otomatis setelah jalankan Password Grant"
+		},
+		{
+			"key": "refreshToken",
+			"value": "",
+			"type": "default",
+			"enabled": true,
+			"description": "Diisi otomatis setelah jalankan Password Grant"
+		},
+		{
+			"key": "iotToken",
+			"value": "",
+			"type": "default",
+			"enabled": true,
+			"description": "Diisi otomatis setelah jalankan Client Credentials Grant"
+		},
+		{
+			"key": "accessTokenWarga",
+			"value": "",
+			"type": "default",
+			"enabled": true,
+			"description": "Diisi otomatis setelah jalankan Password Grant (warga1)"
+		},
+		{
+			"key": "basicAuth",
+			"value": "c21hcnRjaXR5LWFwcDpzbWFydGNpdHktc2VjcmV0",
+			"type": "default",
+			"enabled": true,
+			"description": "base64('smartcity-app:smartcity-secret') — untuk header introspect"
+		}
+	],
+	"_postman_variable_scope": "environment",
+	"timestamp": 1749772800000
+}

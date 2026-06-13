@@ -5,9 +5,6 @@ namespace Database\Seeders;
 use App\Models\User;
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
-use Illuminate\Support\Facades\Hash;
-use Laravel\Passport\Client;
-use Laravel\Passport\ClientRepository;
 
 class DatabaseSeeder extends Seeder
 {
@@ -18,6 +15,7 @@ class DatabaseSeeder extends Seeder
      */
     public function run(): void
     {
+<<<<<<< HEAD
         User::firstOrCreate(
             ['username' => 'admin'],
             [
@@ -47,5 +45,13 @@ class DatabaseSeeder extends Seeder
         if (! Client::where('name', 'iot-device')->exists()) {
             $clients->createClientCredentialsGrantClient('iot-device');
         }
+=======
+        // User::factory(10)->create();
+
+        User::factory()->create([
+            'name' => 'Test User',
+            'email' => 'test@example.com',
+        ]);
+>>>>>>> 7c82b8cb177e6524c24803cf44868762e581f8f3
     }
 }

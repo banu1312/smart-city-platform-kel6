@@ -11,7 +11,6 @@
     "require": {
         "php": "^8.2",
         "laravel/framework": "^12.0",
-        "laravel/passport": "^13.7",
         "laravel/tinker": "^2.10.1"
     },
     "require-dev": {
@@ -43,9 +42,6 @@
             "@php -r \"file_exists('.env') || copy('.env.example', '.env');\"",
             "@php artisan key:generate",
             "@php artisan migrate --force",
-            "@php artisan passport:keys --force",
-            "@php artisan passport:client --personal --name=\"Smart City Personal Access Client\" --no-interaction",
-            "@php artisan db:seed --force",
             "npm install",
             "npm run build"
         ],
