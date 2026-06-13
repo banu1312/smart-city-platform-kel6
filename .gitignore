@@ -1,0 +1,26 @@
+# Dependencies
+node_modules/
+vendor/
+venv/
+.venv/
+__pycache__/
+*.pyc
+
+# Kredensial & Lingkungan (Wajib di-ignore!)
+.env
+.env.local
+
+# File Model ML & Dataset Biner
+python-ml-service/models/*.pkl
+python-ml-service/data/*.csv
+.ipynb_checkpoints/
+
+# Sistem Operasi
+.DS_Store
+Thumbs.db
+
+# Data Volume Docker Lokal
+.docker_data/
+mysql-data/
+rabbitmq-data/
+grafana-data/
