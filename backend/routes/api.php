@@ -1,25 +1,34 @@
 <?php
-
-use App\Http\Controllers\CitizenController;
-use App\Http\Controllers\EnvironmentController;
-use App\Http\Controllers\TrafficController;
 use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\Citizen\CitizenController;
+use App\Http\Controllers\Citizen\ReportController;
+use App\Http\Controllers\Citizen\NotifController;
+use App\Http\Controllers\Waste\WasteController;
+use App\Http\Controllers\Waste\IncidentController;
+use App\Http\Controllers\Environment\SensorController;
+use App\Http\Controllers\Environment\AlertController;
 
-// NOTE: OAuth2 endpoints (/oauth/token, /oauth/introspect, /oauth/revoke,
-// /oauth/clients, etc.) are registered automatically by Laravel Passport.
+// ── HEALTH CHECKS ──────────────────────────────────────
+Route::get('/citizens/health', [CitizenController::class, 'health']);
+Route::get('/waste/health',    [WasteController::class,  'health']);
+Route::get('/environment/health', [SensorController::class, 'health']);
 
-Route::get('/health', function () {
-    return response()->json([
-        'status' => 'success',
-        'code' => 200,
-        'message' => 'Smart City Platform API is running',
-        'service' => 'backend',
-        'timestamp' => now()->toIso8601String(),
-    ]);
-});
+// ── CITIZEN SERVICE ────────────────────────────────────
+Route::post('/citizens',              [CitizenController::class, 'store']);
+Route::get('/citizens/{id}',          [CitizenController::class, 'show']);
+Route::post('/reports',               [ReportController::class,  'store']);
+Route::get('/reports',                [ReportController::class,  'index']);
+Route::patch('/reports/{id}/status',  [ReportController::class,  'updateStatus']);
+Route::get('/notifications',          [NotifController::class,   'index']);
 
-Route::middleware('auth:api')->prefix('v1')->group(function () {
-    Route::apiResource('citizens', CitizenController::class);
-    Route::apiResource('environment-sensors', EnvironmentController::class);
-    Route::apiResource('traffic-records', TrafficController::class);
-});
+// ── WASTE SERVICE ──────────────────────────────────────
+Route::post('/waste/readings',   [WasteController::class,    'store']);
+Route::get('/waste/current',     [WasteController::class,    'current']);
+Route::get('/waste/history',     [WasteController::class,    'history']);
+Route::get('/waste/incidents',   [IncidentController::class, 'index']);
+Route::post('/waste/incidents',  [IncidentController::class, 'store']);
+
+// ── ENVIRONMENT SERVICE ────────────────────────────────
+Route::post('/environment/readings', [SensorController::class, 'store']);
+Route::get('/environment/current',   [SensorController::class, 'current']);
+Route::get('/environment/alerts',    [AlertController::class,  'index']);
