@@ -9,6 +9,8 @@ __pycache__/
 # Kredensial & Lingkungan (Wajib di-ignore!)
 .env
 .env.local
+*.env
+!.env.example
 
 # File Model ML & Dataset Biner
 python-ml-service/models/*.pkl
@@ -27,3 +29,12 @@ Thumbs.db
 mysql-data/
 rabbitmq-data/
 grafana-data/
+
+# IoT - kredensial & data lokal
+iot/passwd
+iot/data/
+iot/log/
+iot/venv/
+iot/.env
+iot/__pycache__/
+*.pyc
