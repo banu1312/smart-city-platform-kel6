@@ -2,6 +2,11 @@ require("dotenv").config();
 const express = require("express");
 const axios = require("axios");
 const logger = require("./middleware/logger");
+const {
+	globalLimiter,
+	authLimiter,
+	oauthLimiter,
+} = require("./middleware/rateLimit");
 const { registerProxyRoutes } = require("./routes/proxy");
 const { sendError } = require("./utils/response");
 
@@ -9,9 +14,14 @@ const app = express();
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
+// Logger 
 app.use(logger);
 
-// Health check (publik)
+// Rate Limiter Global (per IP) - pasang di semua route 
+app.use(globalLimiter);
+
+// Health check (publik, skip rate limit)
 app.get("/health", (req, res) => {
 	res.json({
 		status: "success",
@@ -23,13 +33,12 @@ app.get("/health", (req, res) => {
 	});
 });
 
-// Manual forward /oauth/ → OAuth Server
+// OAuth Forward — pakai oauthLimiter (lebih ketat)
 const oauthUrl = process.env.OAUTH_SERVER_URL || "http://localhost:3002";
 
-app.use("/oauth", async (req, res) => {
+app.use("/oauth", oauthLimiter, async (req, res) => {
 	try {
 		const targetUrl = `${oauthUrl}/oauth${req.path === "/" ? "" : req.path}`;
-
 		console.log(`[OAuth Forward] ${req.method} ${targetUrl}`);
 
 		const response = await axios({
@@ -47,11 +56,9 @@ app.use("/oauth", async (req, res) => {
 
 		return res.status(response.status).json(response.data);
 	} catch (err) {
-		// Axios error — upstream tidak bisa dijangkau
 		if (err.code === "ECONNREFUSED" || err.code === "ENOTFOUND") {
 			return sendError(res, "OAuth Server unavailable", 503);
 		}
-		// OAuth Server balas dengan error (401, 400, dll) — teruskan ke client
 		if (err.response) {
 			return res.status(err.response.status).json(err.response.data);
 		}
@@ -60,8 +67,8 @@ app.use("/oauth", async (req, res) => {
 	}
 });
 
-// Protected proxy routes
-registerProxyRoutes(app);
+// Protected proxy routes (pakai authLimiter juga)
+registerProxyRoutes(app, authLimiter);
 
 // 404 handler
 app.use((req, res) => {
