@@ -8,49 +8,46 @@ const makeProxy = (target, pathRewrite = {}) => {
 		changeOrigin: true,
 		pathRewrite,
 		onError: (err, req, res) => {
-			console.error(`[Proxy Error] ${target}: ${err.message}`);
-			res.status(502).json({
-				status: "error",
-				code: 502,
-				message: `Upstream service unavailable: ${target}`,
-				data: null,
-				service: "api-gateway",
-				timestamp: new Date().toISOString(),
-			});
+			console.error(`[Proxy Error] → ${target}: ${err.message}`);
+			sendError(res, `Upstream service unavailable: ${target}`, 502);
 		},
 	});
 };
 
-const registerProxyRoutes = (app) => {
+// authLimiter diterima dari index.js agar bisa diganti saat testing
+const registerProxyRoutes = (app, authLimiter) => {
 	const citizenUrl = process.env.CITIZEN_SERVICE_URL || "http://localhost:8000";
 	const trafficUrl = process.env.TRAFFIC_SERVICE_URL || "http://localhost:8001";
 	const envUrl = process.env.ENV_SERVICE_URL || "http://localhost:8002";
 	const mlUrl = process.env.PYTHON_ML_URL || "http://localhost:5000";
 
-	// Citizen Service (port 8000)
-	app.use("/api/citizens", verifyJWT, makeProxy(citizenUrl));
-	app.use("/api/reports", verifyJWT, makeProxy(citizenUrl));
-	app.use("/api/notifications", verifyJWT, makeProxy(citizenUrl));
+	// middleware stack: authLimiter → verifyJWT → proxy
+	const protect = authLimiter ? [authLimiter, verifyJWT] : [verifyJWT];
 
-	// Traffic Service (port 8001)
-	app.use("/api/traffic", verifyJWT, makeProxy(trafficUrl));
+	// Citizen Service 
+	app.use("/api/citizens", ...protect, makeProxy(citizenUrl));
+	app.use("/api/reports", ...protect, makeProxy(citizenUrl));
+	app.use("/api/notifications", ...protect, makeProxy(citizenUrl));
 
-	// Environment Service (port 8002)
-	app.use("/api/environment", verifyJWT, makeProxy(envUrl));
+	// Traffic Service
+	app.use("/api/traffic", ...protect, makeProxy(trafficUrl));
 
-	// Python ML Service (port 5000)
-	app.use("/predict", verifyJWT, makeProxy(mlUrl));
-	app.use("/detect", verifyJWT, makeProxy(mlUrl));
-	app.use("/model", verifyJWT, makeProxy(mlUrl));
+	// Environment Service
+	app.use("/api/environment", ...protect, makeProxy(envUrl));
 
-	//  IoT Routes - dari Node-RED, pakai client_credentials token
+	// Python ML Service
+	app.use("/predict", ...protect, makeProxy(mlUrl));
+	app.use("/detect", ...protect, makeProxy(mlUrl));
+	app.use("/model", ...protect, makeProxy(mlUrl));
+
+	// IoT Routes (client_credentials token)
 	app.use(
-		"/iot",
+		"/iot/traffic",
 		verifyIoTToken,
 		makeProxy(trafficUrl, { "^/iot/traffic": "/api/traffic/readings" }),
 	);
 	app.use(
-		"/iot",
+		"/iot/air",
 		verifyIoTToken,
 		makeProxy(envUrl, { "^/iot/air": "/api/environment/readings" }),
 	);
