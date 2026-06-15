@@ -8,6 +8,9 @@ const {
 	oauthLimiter,
 } = require("./middleware/rateLimit");
 const { registerProxyRoutes } = require("./routes/proxy");
+const { registerHealthRoute } = require("./routes/health");
+const { registerIoTRoutes } = require("./routes/iot");
+const { metricsMiddleware, registerMetricsRoute } = require("./routes/metrics");
 const { sendError } = require("./utils/response");
 
 const app = express();
@@ -18,22 +21,19 @@ app.use(express.urlencoded({ extended: true }));
 // Logger 
 app.use(logger);
 
-// Rate Limiter Global (per IP) - pasang di semua route 
+// Metrics tracking 
+app.use(metricsMiddleware);
+
+// Rate Limiter Global (per IP) 
 app.use(globalLimiter);
 
-// Health check (publik, skip rate limit)
-app.get("/health", (req, res) => {
-	res.json({
-		status: "success",
-		code: 200,
-		message: "API Gateway is running",
-		data: { gateway: "ok" },
-		service: "api-gateway",
-		timestamp: new Date().toISOString(),
-	});
-});
+// Health Aggregator (publik, skip rate limit) 
+registerHealthRoute(app);
 
-// OAuth Forward — pakai oauthLimiter (lebih ketat)
+// Metrics endpoint (internal) 
+registerMetricsRoute(app);
+
+// OAuth Forward 
 const oauthUrl = process.env.OAUTH_SERVER_URL || "http://localhost:3002";
 
 app.use("/oauth", oauthLimiter, async (req, res) => {
@@ -67,15 +67,18 @@ app.use("/oauth", oauthLimiter, async (req, res) => {
 	}
 });
 
-// Protected proxy routes (pakai authLimiter juga)
+// IoT Routes 
+registerIoTRoutes(app);
+
+// Protected Proxy Routes 
 registerProxyRoutes(app, authLimiter);
 
-// 404 handler
+// 404 handler 
 app.use((req, res) => {
 	sendError(res, `Route ${req.method} ${req.path} not found`, 404);
 });
 
-// Global error handler
+// Global error handler 
 app.use((err, req, res, _next) => {
 	console.error("[Gateway Error]", err.message);
 	sendError(res, "Internal Gateway Error", 500);
