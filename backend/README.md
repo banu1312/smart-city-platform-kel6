@@ -141,10 +141,3 @@ POST /api/bins/telemetry
 
 ---
 
-# Arsitektur Singkat
-
-- **Smart Bin Service** menerima data sensor IoT.
-- **Fleet Service** mengatur armada pengangkut sampah.
-- **Citizen Report Service** menerima laporan warga.
-- **RabbitMQ** digunakan sebagai message broker antar service.
-- **Python ML Service** melakukan analisis telemetry dan prioritas pengangkutan.

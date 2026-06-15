@@ -1,0 +1,50 @@
+{
+  "version": 1,
+  "author": "TrashTrack — IoT & Messaging Engineer",
+  "editor": "wokwi",
+  "parts": [
+    { "type": "wokwi-esp32-devkit-v1", "id": "esp", "top": 160, "left": 200, "attrs": {} },
+    {
+      "type": "wokwi-hc-sr04",
+      "id": "ultrasonic1",
+      "top": 0,
+      "left": 0,
+      "attrs": { "distance": "147" }
+    },
+    {
+      "type": "wokwi-potentiometer",
+      "id": "mq2_sim",
+      "top": -1.3,
+      "left": 355,
+      "attrs": { "label": "MQ-2 Gas Sensor (Simulated)", "value": "0.3" }
+    },
+    {
+      "type": "wokwi-led",
+      "id": "led_status",
+      "top": 380.4,
+      "left": 80.6,
+      "attrs": { "color": "red", "label": "CRITICAL" }
+    },
+    {
+      "type": "wokwi-resistor",
+      "id": "r1",
+      "top": 397.55,
+      "left": 144,
+      "attrs": { "value": "220" }
+    }
+  ],
+  "connections": [
+    [ "esp:GND.1", "ultrasonic1:GND", "black", [ "h44.3", "v-155.4", "h-244.3" ] ],
+    [ "esp:5V", "ultrasonic1:VCC", "red", [] ],
+    [ "esp:D12", "ultrasonic1:TRIG", "green", [] ],
+    [ "esp:D14", "ultrasonic1:ECHO", "yellow", [] ],
+    [ "esp:GND.2", "mq2_sim:GND", "black", [ "h-13", "v65.4", "h187" ] ],
+    [ "esp:3V3", "mq2_sim:VCC", "red", [] ],
+    [ "esp:D34", "mq2_sim:SIG", "orange", [ "h-22.6", "v-88.3", "h206.6" ] ],
+    [ "esp:D2", "r1:1", "purple", [ "h25.1", "v93.6", "h-182.4" ] ],
+    [ "r1:2", "led_status:A", "purple", [ "v38.4", "h-97.2" ] ],
+    [ "led_status:C", "esp:GND.3", "black", [] ],
+    [ "led_status:C", "esp:GND.2", "green", [ "v19.2", "h-18.8", "v-132.6" ] ]
+  ],
+  "dependencies": {}
+}

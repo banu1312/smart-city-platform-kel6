@@ -2,34 +2,43 @@ require("dotenv").config();
 const express = require("express");
 const axios = require("axios");
 const logger = require("./middleware/logger");
+const {
+	globalLimiter,
+	authLimiter,
+	oauthLimiter,
+} = require("./middleware/rateLimit");
 const { registerProxyRoutes } = require("./routes/proxy");
+const { registerHealthRoute } = require("./routes/health");
+const { registerIoTRoutes } = require("./routes/iot");
+const { metricsMiddleware, registerMetricsRoute } = require("./routes/metrics");
 const { sendError } = require("./utils/response");
 
 const app = express();
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
+// Logger 
 app.use(logger);
 
-// Health check (publik)
-app.get("/health", (req, res) => {
-	res.json({
-		status: "success",
-		code: 200,
-		message: "API Gateway is running",
-		data: { gateway: "ok" },
-		service: "api-gateway",
-		timestamp: new Date().toISOString(),
-	});
-});
+// Metrics tracking 
+app.use(metricsMiddleware);
 
-// Manual forward /oauth/ → OAuth Server
+// Rate Limiter Global (per IP) 
+app.use(globalLimiter);
+
+// Health Aggregator (publik, skip rate limit) 
+registerHealthRoute(app);
+
+// Metrics endpoint (internal) 
+registerMetricsRoute(app);
+
+// OAuth Forward 
 const oauthUrl = process.env.OAUTH_SERVER_URL || "http://localhost:3002";
 
-app.use("/oauth", async (req, res) => {
+app.use("/oauth", oauthLimiter, async (req, res) => {
 	try {
 		const targetUrl = `${oauthUrl}/oauth${req.path === "/" ? "" : req.path}`;
-
 		console.log(`[OAuth Forward] ${req.method} ${targetUrl}`);
 
 		const response = await axios({
@@ -47,11 +56,9 @@ app.use("/oauth", async (req, res) => {
 
 		return res.status(response.status).json(response.data);
 	} catch (err) {
-		// Axios error — upstream tidak bisa dijangkau
 		if (err.code === "ECONNREFUSED" || err.code === "ENOTFOUND") {
 			return sendError(res, "OAuth Server unavailable", 503);
 		}
-		// OAuth Server balas dengan error (401, 400, dll) — teruskan ke client
 		if (err.response) {
 			return res.status(err.response.status).json(err.response.data);
 		}
@@ -60,15 +67,18 @@ app.use("/oauth", async (req, res) => {
 	}
 });
 
-// Protected proxy routes
-registerProxyRoutes(app);
+// IoT Routes 
+registerIoTRoutes(app);
 
-// 404 handler
+// Protected Proxy Routes 
+registerProxyRoutes(app, authLimiter);
+
+// 404 handler 
 app.use((req, res) => {
 	sendError(res, `Route ${req.method} ${req.path} not found`, 404);
 });
 
-// Global error handler
+// Global error handler 
 app.use((err, req, res, _next) => {
 	console.error("[Gateway Error]", err.message);
 	sendError(res, "Internal Gateway Error", 500);

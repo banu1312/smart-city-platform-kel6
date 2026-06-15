@@ -18,7 +18,6 @@ const verifyJWT = (req, res, next) => {
 
 	try {
 		const decoded = jwt.verify(token, process.env.JWT_SECRET);
-		// Tempel payload ke request agar bisa dipakai handler berikutnya
 		req.user = decoded;
 		req.token = token;
 		next();
@@ -54,7 +53,7 @@ const verifyJWT = (req, res, next) => {
 	}
 };
 
-// Middleware khusus untuk IoT device — validasi scope 'service'
+// Khusus IoT device — validasi scope 'service'
 const verifyIoTToken = (req, res, next) => {
 	verifyJWT(req, res, () => {
 		if (
@@ -66,7 +65,7 @@ const verifyIoTToken = (req, res, next) => {
 		return res.status(403).json({
 			status: "error",
 			code: 403,
-			message: "Forbidden: IoT scope required.",
+			message: "Forbidden: IoT service scope required.",
 			data: null,
 			service: "api-gateway",
 			timestamp: new Date().toISOString(),
@@ -74,4 +73,21 @@ const verifyIoTToken = (req, res, next) => {
 	});
 };
 
-module.exports = { verifyJWT, verifyIoTToken };
+// Khusus endpoint admin
+const verifyAdmin = (req, res, next) => {
+	verifyJWT(req, res, () => {
+		if (req.user && req.user.role === "admin") {
+			return next();
+		}
+		return res.status(403).json({
+			status: "error",
+			code: 403,
+			message: "Forbidden: Admin role required.",
+			data: null,
+			service: "api-gateway",
+			timestamp: new Date().toISOString(),
+		});
+	});
+};
+
+module.exports = { verifyJWT, verifyIoTToken, verifyAdmin };

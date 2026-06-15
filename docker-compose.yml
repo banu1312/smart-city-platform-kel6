@@ -1,0 +1,28 @@
+services:
+
+  mysql:
+    image: mysql:8.0
+    container_name: trashtrack-mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpass
+      MYSQL_DATABASE: trashtrack
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql-data:/var/lib/mysql
+    
+  rabbitmq:
+    image: rabbitmq:3.12-management
+    container_name: trashtrack-rabbitmq
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+  
+  mosquitto:
+    image: eclipse-mosquitto:2.0
+    container_name: trashtrack-mosquitto
+    ports:
+      - "1883:1883"
+  
+volumes:
+  mysql-data:
