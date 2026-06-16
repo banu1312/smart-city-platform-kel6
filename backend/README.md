@@ -1,143 +1,178 @@
-# Smart City Platform Kelompok 6
-
-## Cara Setup & Jalankan Backend
-
-### 1. Masuk ke Folder Backend
+# Cara Setup Backend
 
 ```bash
+# 1. Clone repo dan masuk folder backend
 cd smart-city-platform-kel6/backend
-```
 
-### 2. Install Dependencies
-
-```bash
+# 2. Install dependencies
 composer install --ignore-platform-req=ext-sockets
-```
 
-### 3. Copy dan Konfigurasi Environment
-
-```bash
+# 3. Setup .env
 cp .env.example .env
-```
 
-Edit file `.env` dan sesuaikan:
+# Edit:
+# DB_HOST=127.0.0.1
+# DB_DATABASE=smartcity
+# DB_USERNAME=root
+# DB_PASSWORD=
 
-```env
-DB_HOST=
-DB_DATABASE=
-DB_USERNAME=
-DB_PASSWORD=
-```
-
-### 4. Jalankan Migration
-
-```bash
+# 4. Jalankan migration
 php artisan migrate
-```
 
-### 5. Jalankan Seeder
-
-```bash
+# 5. Isi data dummy
 php artisan db:seed
-```
 
-### 6. Jalankan Server
+# 6. Setup storage untuk foto
+php artisan storage:link
 
-```bash
+# 7. Jalankan server
 php artisan serve --port=8000
 ```
 
 ---
 
-# Daftar Endpoint Lengkap
+## Daftar Endpoint Lengkap
 
-**Base URL**
+### Base URL
 
+**Local**
 ```text
 http://localhost:8000/api
 ```
+
+**Server**
+```text
+http://103.147.92.134:8000/api
+```
+
+---
+
+## Health Checks
+
+| Method | Endpoint | Deskripsi |
+|----------|----------|----------|
+| GET | `/smart-bin/health` | Status Smart Bin Service |
+| GET | `/fleet/health` | Status Fleet Service |
+| GET | `/citizen-report/health` | Status Citizen Report Service |
 
 ---
 
 ## Smart Bin Service
 
-| Method | Endpoint | Deskripsi | Body |
+| Method | Endpoint | Auth | Deskripsi |
 |----------|----------|----------|----------|
-| GET | `/smart-bin/health` | Health check | - |
-| GET | `/bins` | List semua tong + status terkini | - |
-| POST | `/bins` | Daftarkan tong baru | `zone_id`, `location`, `capacity_kg` |
-| GET | `/bins/{id}/history` | Riwayat sensor per tong | - |
-| POST | `/bins/telemetry` | Data IoT dari Node-RED | `bin_id`, `zone_id`, `fill_level`, `gas_level`, `temperature`, `distance_cm` |
+| GET | `/bins` | JWT | List semua tong + status terkini (cached 30s) |
+| GET | `/bins/{id}` | JWT | Detail tong + 5 log sensor terakhir (cached 30s) |
+| PUT | `/bins/{id}/maintenance` | JWT | Set tong ke status Maintenance |
+| POST | `/iot/telemetry` | API Key | Terima data sensor dari Node-RED |
+
+### Payload POST `/api/iot/telemetry`
+
+```json
+{
+  "trash_bin_id": 1,
+  "distance_cm": 20.5,
+  "methane_ppm": 12.3,
+  "temperature_c": 31.5,
+  "raw_payload": {
+    "source": "wokwi-esp32",
+    "zone": "zone1"
+  }
+}
+```
 
 ---
 
 ## Fleet Service
 
-| Method | Endpoint | Deskripsi | Body |
+| Method | Endpoint | Auth | Deskripsi |
 |----------|----------|----------|----------|
-| GET | `/fleet/health` | Health check | - |
-| GET | `/fleet/trucks` | Daftar armada truk | - |
-| POST | `/fleet/dispatch` | Buat surat tugas supir | `truck_id`, `bin_id`, `zone_id`, `priority`, `triggered_by` |
-| PUT | `/fleet/tasks/{id}/status` | Update status tugas | `status` |
+| GET | `/fleet/trucks` | JWT | Daftar truk + jadwal aktif |
+| POST | `/fleet/driver-checkin` | JWT | Supir ubah status jadi Available |
+| PUT | `/fleet/schedules/{id}/status` | JWT | Supir update status jadwal |
+| POST | `/fleet/auto-dispatch` | Internal | Terima prediksi dari Python ML |
+
+### Payload POST `/api/fleet/auto-dispatch`
+
+```json
+{
+  "trash_bin_id": 3,
+  "pickup_priority": "Urgent",
+  "hours_until_full": 1.5
+}
+```
+
+### Nilai `pickup_priority`
+
+- Low
+- Medium
+- Urgent
+- Critical
+
+### Nilai `execution_status`
+
+- Pending
+- In-Progress
+- Completed
 
 ---
 
 ## Citizen Report Service
 
-| Method | Endpoint | Deskripsi | Body |
+| Method | Endpoint | Auth | Deskripsi |
 |----------|----------|----------|----------|
-| GET | `/citizen-report/health` | Health check | - |
-| POST | `/reports` | Submit laporan warga | `title`, `zone_id`, `description`, `latitude`, `longitude`, `photo_url` |
-| GET | `/reports/zone/{zone_id}` | List laporan per zona | - |
+| POST | `/reports` | JWT | Warga submit laporan (multipart/form-data) |
+| POST | `/reports/{id}/verify` | JWT + Admin | Admin verifikasi laporan |
+| POST | `/reports/{id}/dispatch` | JWT + Admin | Admin assign truk ke laporan |
+
+### Form Fields POST `/api/reports`
+
+| Field | Tipe | Keterangan |
+|---------|---------|---------|
+| `reporter_name` | string | Required |
+| `reporter_phone` | string | Optional |
+| `geo_coordinate` | string | Required, format `"-6.1944,106.8318"` |
+| `issue_description` | string | Optional |
+| `photo` | file | Required, max 2MB, jpg/jpeg/png |
 
 ---
 
-# Format Response Standar
+## RabbitMQ Events yang Dipublish Backend
 
-```json
-{
-    "status": "success",
-    "code": 200,
-    "data": {},
-    "message": "Keterangan singkat",
-    "timestamp": "2026-06-14T00:00:00+00:00",
-    "service": "smart-bin-service"
-}
+| Routing Key | Trigger | Consumer | Payload |
+|------------|----------|----------|----------|
+| `bin.updated` | Setiap data IoT masuk | Python ML | `bin_id, volume_pct, methane, temperature, delta_volume` |
+| `vandalism.alert` | `delta_volume < -5` atau `suhu > 36` | Fleet Service | `bin_id, data sensor` |
+| `report.submitted` | Warga submit laporan | ML Priority | `report_id, geo_coordinate` |
+
+---
+
+## Struktur Database
+
+### Smart Bin
+
+```text
+trash_bins
+└── sensor_logs
 ```
 
----
+- `trash_bins` → data master tong sampah
+- `sensor_logs` → riwayat data sensor IoT
 
-# Payload IoT
+### Fleet
 
-Contoh payload dari Node-RED ke:
-
-```http
-POST /api/bins/telemetry
+```text
+trucks
+└── schedules
 ```
 
-```json
-{
-    "bin_id": 1,
-    "zone_id": 1,
-    "fill_level": 85.5,
-    "gas_level": 150.2,
-    "temperature": 32.1,
-    "distance_cm": 14.5,
-    "is_anomaly": 0
-}
+- `trucks` → data armada truk
+- `schedules` → jadwal penjemputan
+
+### Citizen Report
+
+```text
+sanitation_reports
 ```
 
----
-
-# RabbitMQ Events
-
-| Routing Key | Publisher | Consumer | Trigger |
-|------------|------------|------------|------------|
-| `bin.telemetry` | Smart Bin | Python ML | Setiap telemetry masuk |
-| `bin.alert` | Smart Bin | Fleet Service | `fill_level > 80%` |
-| `bin.anomaly` | Smart Bin | Fleet Service | `is_anomaly = true` |
-| `fleet.dispatched` | Fleet | Notifikasi / IoT | Truk dikirim |
-| `report.submitted` | Citizen Report | ML Priority Route | Laporan warga masuk |
-
----
-
+- `sanitation_reports` → laporan warga
