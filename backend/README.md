@@ -40,11 +40,6 @@ php artisan serve --port=8000
 http://localhost:8000/api
 ```
 
-**Server**
-```text
-http://103.147.92.134:8000/api
-```
-
 ---
 
 ## Health Checks
