@@ -7,16 +7,16 @@ use Illuminate\Support\Facades\DB;
 class TruckSeeder extends Seeder {
     public function run(): void {
         DB::table('trucks')->insertOrIgnore([
-            ['plate_number'=>'B 1234 ABC', 'driver_name'=>'Budi Santoso',   'capacity_kg'=>2000.0, 'status'=>'available',   'zone_id'=>1],
-            ['plate_number'=>'B 5678 DEF', 'driver_name'=>'Ahmad Fauzi',    'capacity_kg'=>2000.0, 'status'=>'on_duty',     'zone_id'=>2],
-            ['plate_number'=>'B 9012 GHI', 'driver_name'=>'Riko Pratama',   'capacity_kg'=>1500.0, 'status'=>'available',   'zone_id'=>3],
-            ['plate_number'=>'B 3456 JKL', 'driver_name'=>'Hendro Wijaya',  'capacity_kg'=>2000.0, 'status'=>'available',   'zone_id'=>4],
-            ['plate_number'=>'B 7890 MNO', 'driver_name'=>'Doni Kurniawan', 'capacity_kg'=>1500.0, 'status'=>'maintenance', 'zone_id'=>5],
-            ['plate_number'=>'B 2345 PQR', 'driver_name'=>'Wahyu Nugroho',  'capacity_kg'=>2000.0, 'status'=>'available',   'zone_id'=>1],
-            ['plate_number'=>'B 6789 STU', 'driver_name'=>'Fajar Hidayat',  'capacity_kg'=>1500.0, 'status'=>'available',   'zone_id'=>2],
-            ['plate_number'=>'B 0123 VWX', 'driver_name'=>'Bayu Saputra',   'capacity_kg'=>2000.0, 'status'=>'on_duty',     'zone_id'=>3],
-            ['plate_number'=>'B 4567 YZA', 'driver_name'=>'Irwan Maulana',  'capacity_kg'=>1500.0, 'status'=>'available',   'zone_id'=>4],
-            ['plate_number'=>'B 8901 BCD', 'driver_name'=>'Kevin Pratama',  'capacity_kg'=>2000.0, 'status'=>'available',   'zone_id'=>5],
+            ['license_plate'=>'B 1234 ABC', 'max_capacity_ton'=>2.0, 'current_status'=>'Available', 'driver_name'=>'Budi Santoso'],
+            ['license_plate'=>'B 5678 DEF', 'max_capacity_ton'=>2.0, 'current_status'=>'On-Route',  'driver_name'=>'Ahmad Fauzi'],
+            ['license_plate'=>'B 9012 GHI', 'max_capacity_ton'=>1.5, 'current_status'=>'Available', 'driver_name'=>'Riko Pratama'],
+            ['license_plate'=>'B 3456 JKL', 'max_capacity_ton'=>2.0, 'current_status'=>'Available', 'driver_name'=>'Hendro Wijaya'],
+            ['license_plate'=>'B 7890 MNO', 'max_capacity_ton'=>1.5, 'current_status'=>'Off-Duty',  'driver_name'=>'Doni Kurniawan'],
+            ['license_plate'=>'B 2345 PQR', 'max_capacity_ton'=>2.0, 'current_status'=>'Available', 'driver_name'=>'Wahyu Nugroho'],
+            ['license_plate'=>'B 6789 STU', 'max_capacity_ton'=>1.5, 'current_status'=>'Available', 'driver_name'=>'Fajar Hidayat'],
+            ['license_plate'=>'B 0123 VWX', 'max_capacity_ton'=>2.0, 'current_status'=>'On-Route',  'driver_name'=>'Bayu Saputra'],
+            ['license_plate'=>'B 4567 YZA', 'max_capacity_ton'=>1.5, 'current_status'=>'Available', 'driver_name'=>'Irwan Maulana'],
+            ['license_plate'=>'B 8901 BCD', 'max_capacity_ton'=>2.0, 'current_status'=>'Off-Duty',  'driver_name'=>'Kevin Pratama'],
         ]);
     }
 }

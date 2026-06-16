@@ -5,13 +5,12 @@ use Illuminate\Database\Eloquent\Model;
 
 class Truck extends Model {
     protected $table    = 'trucks';
-    protected $fillable = ['plate_number', 'driver_name', 'capacity_kg', 'status', 'zone_id'];
+    protected $fillable = [
+        'license_plate', 'max_capacity_ton',
+        'current_status', 'driver_name'
+    ];
 
-    public function zone() {
-        return $this->belongsTo(Zone::class);
-    }
-
-    public function tasks() {
-        return $this->hasMany(DispatchTask::class);
+    public function schedules() {
+        return $this->hasMany(Schedule::class, 'truck_id');
     }
 }
