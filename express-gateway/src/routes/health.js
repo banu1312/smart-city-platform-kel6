@@ -6,9 +6,12 @@ const checkService = async (name, url) => {
 		const response = await axios.get(url, { timeout: 5000 });
 		const latency = Date.now() - start;
 
+		const statusValue = response.data?.status;
+		const isHealthy = statusValue === "ok" || statusValue === "success";
+
 		return {
 			name,
-			status: response.data?.status === "ok" ? "ok" : "degraded",
+			status: isHealthy ? "ok" : "degraded",
 			latency_ms: latency,
 			url,
 		};
