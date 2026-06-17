@@ -16,40 +16,31 @@ const makeProxy = (target, pathRewrite = {}) => {
 
 // authLimiter diterima dari index.js agar bisa diganti saat testing
 const registerProxyRoutes = (app, authLimiter) => {
-	const citizenUrl = process.env.CITIZEN_SERVICE_URL || "http://localhost:8000";
-	const trafficUrl = process.env.TRAFFIC_SERVICE_URL || "http://localhost:8001";
-	const envUrl = process.env.ENV_SERVICE_URL || "http://localhost:8002";
-	const mlUrl = process.env.PYTHON_ML_URL || "http://localhost:5000";
+	const backendUrl = process.env.BACKEND_URL || "http://localhost:8000";
+	const mlUrl       = process.env.PYTHON_ML_URL || "http://localhost:5000";
 
-	// middleware stack: authLimiter → verifyJWT → proxy
 	const protect = authLimiter ? [authLimiter, verifyJWT] : [verifyJWT];
 
-	// Citizen Service 
-	app.use("/api/citizens", ...protect, makeProxy(citizenUrl));
-	app.use("/api/reports", ...protect, makeProxy(citizenUrl));
-	app.use("/api/notifications", ...protect, makeProxy(citizenUrl));
+	// BACKEND LARAVEL (single service, port 8000) 
+	app.use("/api/bins",          ...protect, makeProxy(backendUrl));
+	app.use("/api/fleet",         ...protect, makeProxy(backendUrl));
+	app.use("/api/reports",       ...protect, makeProxy(backendUrl));
 
-	// Traffic Service
-	app.use("/api/traffic", ...protect, makeProxy(trafficUrl));
+	//Health check tiap domain di backend - publik, tanpa JWT
+	app.use("/api/smart-bin/health",      makeProxy(backendUrl));
+	app.use("/api/fleet/health",          makeProxy(backendUrl));
+	app.use("/api/citizen-report/health", makeProxy(backendUrl));
 
-	// Environment Service
-	app.use("/api/environment", ...protect, makeProxy(envUrl));
+	// PYTHON ML SERVICE (port 5000) 
+	app.use("/predict",  ...protect, makeProxy(mlUrl));
+	app.use("/detect",   ...protect, makeProxy(mlUrl));
+	app.use("/model",    ...protect, makeProxy(mlUrl));
 
-	// Python ML Service
-	app.use("/predict", ...protect, makeProxy(mlUrl));
-	app.use("/detect", ...protect, makeProxy(mlUrl));
-	app.use("/model", ...protect, makeProxy(mlUrl));
-
-	// IoT Routes (client_credentials token)
+	//  IoT Telemetry
 	app.use(
-		"/iot/traffic",
+		"/iot/telemetry",
 		verifyIoTToken,
-		makeProxy(trafficUrl, { "^/iot/traffic": "/api/traffic/readings" }),
-	);
-	app.use(
-		"/iot/air",
-		verifyIoTToken,
-		makeProxy(envUrl, { "^/iot/air": "/api/environment/readings" }),
+		makeProxy(backendUrl, { "^/iot/telemetry": "/api/iot/telemetry" }),
 	);
 };
 
