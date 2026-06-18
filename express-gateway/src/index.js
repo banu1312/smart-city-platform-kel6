@@ -18,22 +18,13 @@ const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Logger 
 app.use(logger);
-
-// Metrics tracking 
 app.use(metricsMiddleware);
-
-// Rate Limiter Global (per IP) 
 app.use(globalLimiter);
 
-// Health Aggregator (publik, skip rate limit) 
 registerHealthRoute(app);
-
-// Metrics endpoint (internal) 
 registerMetricsRoute(app);
 
-// OAuth Forward 
 const oauthUrl = process.env.OAUTH_SERVER_URL || "http://localhost:3002";
 
 app.use("/oauth", oauthLimiter, async (req, res) => {
@@ -67,18 +58,13 @@ app.use("/oauth", oauthLimiter, async (req, res) => {
 	}
 });
 
-// IoT Routes 
 registerIoTRoutes(app);
-
-// Protected Proxy Routes 
 registerProxyRoutes(app, authLimiter);
 
-// 404 handler 
 app.use((req, res) => {
 	sendError(res, `Route ${req.method} ${req.path} not found`, 404);
 });
 
-// Global error handler 
 app.use((err, req, res, _next) => {
 	console.error("[Gateway Error]", err.message);
 	sendError(res, "Internal Gateway Error", 500);
@@ -87,9 +73,7 @@ app.use((err, req, res, _next) => {
 const PORT = process.env.GATEWAY_PORT || 3000;
 app.listen(PORT, () => {
 	console.log(`[API Gateway] Running on port ${PORT}`);
-	console.log(`  → Citizen  : ${process.env.CITIZEN_SERVICE_URL}`);
-	console.log(`  → Traffic  : ${process.env.TRAFFIC_SERVICE_URL}`);
-	console.log(`  → Env      : ${process.env.ENV_SERVICE_URL}`);
+	console.log(`  → Backend  : ${process.env.BACKEND_URL}`);
 	console.log(`  → Python ML: ${process.env.PYTHON_ML_URL}`);
 	console.log(`  → OAuth    : ${oauthUrl}`);
 });
