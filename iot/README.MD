@@ -1,6 +1,6 @@
 # IoT & Messaging — TrashTrack
 
-Modul IoT untuk sistem **TrashTrack Smart Waste Management**. Bertanggung jawab atas simulasi sensor tong sampah pintar, konfigurasi MQTT broker, dan pengiriman data real-time ke platform.
+Modul IoT untuk sistem **TrashTrack Smart Waste Management**. Bertanggung jawab atas simulasi sensor tong sampah pintar, konfigurasi MQTT broker, pipeline data via Node-RED, dan pengiriman data real-time ke platform.
 
 ---
 
@@ -26,8 +26,10 @@ Modul IoT untuk sistem **TrashTrack Smart Waste Management**. Bertanggung jawab 
 ┌─────────────────────────────────────────────────────┐
 │                 SERVICE LAYER                       │
 │                                                     │
-│  Node-RED / Backend Service (Sprint 2)              │
-│  REST API → API Gateway (Sprint 2)                  │
+│  Node-RED (localhost:1880)                          │
+│  → OAuth Token → REST API Telemetry                 │
+│  → Express Gateway (localhost:3000)                 │
+│  → Laravel Backend (localhost:8000)                 │
 └─────────────────────────────────────────────────────┘
 ```
 
@@ -79,6 +81,11 @@ Modul IoT untuk sistem **TrashTrack Smart Waste Management**. Bertanggung jawab 
 
 ```
 iot/
+├── node-red-data/          # Konfigurasi & flow Node-RED (Sprint 2)
+│   ├── flows.json          # Flow pipeline IoT → Laravel
+│   ├── flows_cred.json     # Kredensial flow (tidak di-commit plaintext)
+│   ├── settings.js         # Konfigurasi Node-RED
+│   └── package.json        # Dependensi Node-RED
 ├── wokwi/
 │   ├── diagram.json        # Skema sirkuit ESP32 untuk Wokwi
 │   └── sketch.ino          # Firmware Arduino ESP32
@@ -99,6 +106,7 @@ iot/
 
 - **Python** 3.9+ dengan pip
 - **Mosquitto** 2.x ([download](https://mosquitto.org/download/))
+- **Node-RED** ([download](https://nodered.org/docs/getting-started/windows))
 - **Windows**: tambahkan `C:\Program Files\mosquitto` ke PATH
 
 ---
@@ -201,6 +209,54 @@ Tekan `Ctrl+C` untuk berhenti.
 
 ---
 
+## Node-RED Pipeline (Sprint 2)
+
+Node-RED bertanggung jawab menjembatani data MQTT dari broker ke REST API Laravel via Express Gateway.
+
+### Alur Flow
+
+```
+MQTT In (city/+/waste)
+  → Parse & validasi payload
+  → Ambil token OAuth (cache 1 jam)
+  → POST /api/iot/telemetry ke Express Gateway
+  → Handle response & retry jika gagal
+```
+
+### Menjalankan Node-RED
+
+```bash
+# Install Node-RED (sekali saja)
+npm install -g --unsafe-perm node-red
+
+# Jalankan dengan konfigurasi project
+node-red --userDir ./iot/node-red-data
+```
+
+Node-RED akan berjalan di `http://localhost:1880`.
+
+### Prasyarat Sebelum Menjalankan
+
+- Laravel backend jalan di `http://localhost:8000` (`php artisan serve`)
+- MySQL jalan dan migration sudah dijalankan (`php artisan migrate`)
+- Express Gateway jalan di `http://localhost:3000`
+- OAuth server jalan (untuk ambil token)
+
+### Test Endpoint Telemetry Langsung
+
+```bash
+# Windows PowerShell
+Invoke-RestMethod -Uri "http://localhost:8000/api/iot/telemetry" `
+  -Method POST `
+  -ContentType "application/json" `
+  -Body '{"trash_bin_id":1,"distance_cm":30}'
+
+# Expected response:
+# {"status":"success","code":201,"data":{...}}
+```
+
+---
+
 ## Menjalankan Simulasi Wokwi (ESP32 Virtual)
 
 Wokwi digunakan sebagai simulator hardware ESP32 + sensor tanpa perlu perangkat fisik.
@@ -278,6 +334,13 @@ mosquitto_sub -h localhost -p 1883 -t "city/#"
 # Output: Connection Refused: not authorised
 ```
 
+### Test 4 — Pipeline Node-RED ke Laravel
+
+```bash
+# Pastikan semua service jalan, lalu jalankan Node-RED
+# Cek di Node-RED debug panel — setiap 30 detik harus muncul response 201
+```
+
 ---
 
 ## Keamanan
@@ -285,14 +348,17 @@ mosquitto_sub -h localhost -p 1883 -t "city/#"
 - Kredensial MQTT **tidak hardcoded** — disimpan di `.env`
 - File `passwd` dan `.env` masuk `.gitignore` — tidak di-commit ke repo
 - `allow_anonymous false` di `mosquitto.conf` — koneksi tanpa kredensial ditolak
+- Token OAuth di-cache di Node-RED dan diperbarui otomatis setiap 1 jam
 
 ---
 
-## Handoff ke Sprint 2
+## Handoff ke Tim Lain
 
-Data yang dipublish dari modul ini siap dikonsumsi oleh tim Sprint 2:
+Data telemetry dari modul ini sudah tersimpan ke database `smartcity` via pipeline:
 
-- **Topik subscribe:** `city/+/waste`
+- **Tabel:** `sensor_logs` dan `trash_bins`
+- **Endpoint:** `POST /api/iot/telemetry`
+- **Topik MQTT subscribe:** `city/+/waste`
 - **Broker lokal:** `localhost:1883` (username: `iot_device`)
 - **Broker publik (Wokwi):** `broker.hivemq.com:1883`
 - **Format payload:** JSON sesuai skema di atas
