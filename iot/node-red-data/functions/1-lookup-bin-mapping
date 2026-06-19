@@ -1,0 +1,25 @@
+const ZONE_TO_BIN = {
+    zone1: { trash_bin_id: 1, capacity_liters: 100 }, // -> bin_code: BIN-MNT-001
+    zone2: { trash_bin_id: 2, capacity_liters: 80 },  // -> bin_code: BIN-MNT-002
+    zone3: { trash_bin_id: 3, capacity_liters: 120 }, // -> bin_code: BIN-KBY-001
+    zone4: { trash_bin_id: 4, capacity_liters: 100 }, // -> bin_code: BIN-KBY-002
+};
+
+const raw = msg.payload;
+
+if (!raw || !raw.zone || !raw.bin_id || raw.fill_level === undefined) {
+    node.warn("Payload tidak lengkap, di-skip: " + JSON.stringify(raw));
+    return null;
+}
+
+const binInfo = ZONE_TO_BIN[raw.zone];
+
+if (!binInfo) {
+    node.warn(`Zone "${raw.zone}" tidak terdaftar di ZONE_TO_BIN, payload di-skip.`);
+    return null;
+}
+
+msg.trash_bin_id = binInfo.trash_bin_id;
+msg.capacity_liters = binInfo.capacity_liters;
+
+return msg;

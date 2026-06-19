@@ -11,10 +11,10 @@ use App\Models\SensorLog;
 use App\Services\RabbitMQPublisher;
 
 class IoTReceiverController extends Controller {
-    private RabbitMQPublisher $publisher;
+    private ?RabbitMQPublisher $publisher = null;
 
     public function __construct() {
-        $this->publisher = new RabbitMQPublisher();
+        // RabbitMQ tidak diinisialisasi di sini supaya tidak crash saat RabbitMQ tidak tersedia
     }
 
     // POST /api/iot/telemetry (ini yang bakal ditembak node-RED setiap 30 detik)
@@ -79,6 +79,9 @@ class IoTReceiverController extends Controller {
             ];
 
             try {
+                // baru diinisialisasi di sini supaya kalau gagal, ditangkap try-catch ini
+                $this->publisher = new RabbitMQPublisher();
+
                 // selalu publish bin.updated untuk ML consume
                 $this->publisher->publish('bin.updated', $payload);
 
