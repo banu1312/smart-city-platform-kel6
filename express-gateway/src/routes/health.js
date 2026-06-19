@@ -1,3 +1,4 @@
+// express-gateway/src/routes/health.js
 const axios = require("axios");
 
 const checkService = async (name, url) => {
@@ -7,7 +8,10 @@ const checkService = async (name, url) => {
 		const latency = Date.now() - start;
 
 		const statusValue = response.data?.status;
-		const isHealthy = statusValue === "ok" || statusValue === "success";
+		const isHealthy =
+			statusValue === "ok" ||
+			statusValue === "success" ||
+			statusValue === "healthy"; // ← tambahan untuk Python ML
 
 		return {
 			name,
