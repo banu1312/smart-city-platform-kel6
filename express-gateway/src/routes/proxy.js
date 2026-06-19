@@ -11,6 +11,23 @@ const makeProxy = (target, pathRewrite = {}) => {
 			console.error(`[Proxy Error] → ${target}: ${err.message}`);
 			sendError(res, `Upstream service unavailable: ${target}`, 502);
 		},
+		onProxyReq: (proxyReq, req, res) => {
+			if (!req.body || !Object.keys(req.body).length) return;
+
+			const contentType = proxyReq.getHeader("Content-Type") || "";
+			let bodyData;
+
+			if (contentType.includes("application/json")) {
+				bodyData = JSON.stringify(req.body);
+			} else if (contentType.includes("application/x-www-form-urlencoded")) {
+				bodyData = new URLSearchParams(req.body).toString();
+			} else {
+				bodyData = JSON.stringify(req.body);
+			}
+
+			proxyReq.setHeader("Content-Length", Buffer.byteLength(bodyData));
+			proxyReq.write(bodyData);
+		},
 	});
 };
 
