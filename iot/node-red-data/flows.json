@@ -42,6 +42,33 @@
         "sessionExpiry": ""
     },
     {
+        "id": "cfgmqttbrokerhivemq01",
+        "type": "mqtt-broker",
+        "name": "HiveMQ Publik (Wokwi)",
+        "broker": "broker.hivemq.com",
+        "port": "1883",
+        "clientid": "",
+        "autoConnect": true,
+        "usetls": false,
+        "protocolVersion": "4",
+        "keepalive": "60",
+        "cleansession": true,
+        "autoUnsubscribe": true,
+        "birthTopic": "",
+        "birthQos": "0",
+        "birthPayload": "",
+        "birthMsg": {},
+        "closeTopic": "",
+        "closePayload": "",
+        "closeMsg": {},
+        "willTopic": "",
+        "willQos": "0",
+        "willPayload": "",
+        "willMsg": {},
+        "userProps": "",
+        "sessionExpiry": ""
+    },
+    {
         "id": "n1mqttin000000001",
         "type": "mqtt in",
         "z": "f1trashtrack0000001",
@@ -56,6 +83,27 @@
         "inputs": 0,
         "x": 140,
         "y": 100,
+        "wires": [
+            [
+                "n2jsonparse00000001"
+            ]
+        ]
+    },
+    {
+        "id": "n1bmqttinhivemq001",
+        "type": "mqtt in",
+        "z": "f1trashtrack0000001",
+        "name": "MQTT In: city/+/waste (Wokwi/HiveMQ)",
+        "topic": "city/+/waste",
+        "qos": "1",
+        "datatype": "utf8",
+        "broker": "cfgmqttbrokerhivemq01",
+        "nl": false,
+        "rap": true,
+        "rh": 0,
+        "inputs": 0,
+        "x": 150,
+        "y": 150,
         "wires": [
             [
                 "n2jsonparse00000001"
@@ -83,7 +131,7 @@
         "type": "function",
         "z": "f1trashtrack0000001",
         "name": "1. Lookup Bin Mapping",
-        "func": "// =============================================================\n// Node-RED Function Node: \"1. Lookup Bin Mapping\"\n// TrashTrack - Sprint 2 - Node-RED Data Pipeline Bridge\n//\n// CARA PAKAI DI NODE-RED:\n// 1. Buat node Function baru, beri nama \"1. Lookup Bin Mapping\"\n// 2. Copy seluruh isi file ini ke tab \"On Message\"\n// 3. Sambungkan setelah node \"JSON Parse\" (sebelum node transform)\n//\n// FUNGSI:\n// simulator.py mengirim \"bin_id\" bergaya BIN-Z1-01 (per zona simulasi),\n// sedangkan tabel trash_bins di Laravel (lihat database/seeders/\n// TrashBinSeeder.php) memakai bin_code & id auto-increment yang\n// berbeda format (BIN-MNT-001, BIN-KBY-001, dst).\n//\n// Supaya pipeline bisa jalan end-to-end tanpa mengubah simulator\n// maupun seeder Laravel, kita map tiap \"zone\" simulator ke SATU\n// trash_bin_id yang valid & sudah ada di database Laravel.\n//\n// PENTING: Sesuaikan pemetaan ini dengan trash_bin_id yang BENAR\n// ada di database Anda. Jalankan query berikut di Laravel untuk\n// memastikan:\n//\n//   php artisan tinker\n//   >>> \\App\\Models\\TrashBin::select('id','bin_code')->get();\n//\n// Lalu sesuaikan ZONE_TO_BIN di bawah ini (trash_bin_id WAJIB\n// cocok dengan kolom \"id\" di tabel trash_bins; capacity_liters\n// dipakai node selanjutnya untuk mengonversi fill_level % menjadi\n// distance_cm, jadi harus sama dengan kolom capacity_liters bin\n// tersebut di database).\n// =============================================================\n\n// id & capacity_liters HARUS sama dengan baris di\n// database/seeders/TrashBinSeeder.php (urutan insert = urutan id 1..N)\nconst ZONE_TO_BIN = {\n    zone1: { trash_bin_id: 1, capacity_liters: 100 }, // -> bin_code: BIN-MNT-001\n    zone2: { trash_bin_id: 2, capacity_liters: 80 },  // -> bin_code: BIN-MNT-002\n    zone3: { trash_bin_id: 3, capacity_liters: 120 }, // -> bin_code: BIN-KBY-001\n    zone4: { trash_bin_id: 4, capacity_liters: 100 }, // -> bin_code: BIN-KBY-002\n};\n\nconst raw = msg.payload;\n\n// Validasi payload dasar dari simulator.py / Wokwi\nif (!raw || !raw.zone || !raw.bin_id || raw.fill_level === undefined) {\n    node.warn(\"Payload tidak lengkap, di-skip: \" + JSON.stringify(raw));\n    return null;\n}\n\nconst binInfo = ZONE_TO_BIN[raw.zone];\n\nif (!binInfo) {\n    node.warn(`Zone \"${raw.zone}\" tidak terdaftar di ZONE_TO_BIN, payload di-skip.`);\n    return null;\n}\n\n// Simpan hasil lookup ke msg, dipakai oleh node\n// \"2. Transform Payload\" berikutnya. msg.payload tidak diubah\n// dulu di sini supaya data mentah masih bisa dipakai/didebug.\nmsg.trash_bin_id = binInfo.trash_bin_id;\nmsg.capacity_liters = binInfo.capacity_liters;\n\nreturn msg;\n",
+        "func": "// =============================================================\n// Node-RED Function Node: \"1. Lookup Bin Mapping\"\n// TrashTrack - Sprint 2 - Node-RED Data Pipeline Bridge\n//\n// CARA PAKAI DI NODE-RED:\n// 1. Buat node Function baru, beri nama \"1. Lookup Bin Mapping\"\n// 2. Copy seluruh isi file ini ke tab \"On Message\"\n// 3. Sambungkan setelah node \"JSON Parse\" (sebelum node transform)\n//\n// FUNGSI:\n// simulator.py mengirim \"bin_id\" bergaya BIN-Z1-01 (per zona simulasi),\n// sedangkan tabel trash_bins di Laravel (lihat database/seeders/\n// TrashBinSeeder.php) memakai bin_code & id auto-increment yang\n// berbeda format (BIN-MNT-001, BIN-KBY-001, dst).\n//\n// Supaya pipeline bisa jalan end-to-end tanpa mengubah simulator\n// maupun seeder Laravel, kita map tiap \"zone\" simulator ke SATU\n// trash_bin_id yang valid & sudah ada di database Laravel.\n//\n// PENTING: Sesuaikan pemetaan ini dengan trash_bin_id yang BENAR\n// ada di database Anda. Jalankan query berikut di Laravel untuk\n// memastikan:\n//\n//   php artisan tinker\n//   >>> \\App\\Models\\TrashBin::select('id','bin_code')->get();\n//\n// Lalu sesuaikan ZONE_TO_BIN di bawah ini (trash_bin_id WAJIB\n// cocok dengan kolom \"id\" di tabel trash_bins; capacity_liters\n// dipakai node selanjutnya untuk mengonversi fill_level % menjadi\n// distance_cm, jadi harus sama dengan kolom capacity_liters bin\n// tersebut di database).\n// =============================================================\n\n// id & capacity_liters HARUS sama dengan baris di\n// database/seeders/TrashBinSeeder.php (urutan insert = urutan id 1..N)\nconst ZONE_TO_BIN = {\n    zone1: { trash_bin_id: 1, capacity_liters: 100 },\n    zone2: { trash_bin_id: 2, capacity_liters: 80 },\n    zone3: { trash_bin_id: 3, capacity_liters: 120 },\n    zone4: { trash_bin_id: 4, capacity_liters: 100 },\n    zone5: { trash_bin_id: 5, capacity_liters: 150 },\n};\n\nconst raw = msg.payload;\n\n// Validasi payload dasar dari simulator.py / Wokwi\nif (!raw || !raw.zone || !raw.bin_id || raw.fill_level === undefined) {\n    node.warn(\"Payload tidak lengkap, di-skip: \" + JSON.stringify(raw));\n    return null;\n}\n\nconst binInfo = ZONE_TO_BIN[raw.zone];\n\nif (!binInfo) {\n    node.warn(`Zone \"${raw.zone}\" tidak terdaftar di ZONE_TO_BIN, payload di-skip.`);\n    return null;\n}\n\n// Simpan hasil lookup ke msg, dipakai oleh node\n// \"2. Transform Payload\" berikutnya. msg.payload tidak diubah\n// dulu di sini supaya data mentah masih bisa dipakai/didebug.\nmsg.trash_bin_id = binInfo.trash_bin_id;\nmsg.capacity_liters = binInfo.capacity_liters;\n\nreturn msg;\n",
         "outputs": 1,
         "timeout": 0,
         "noerr": 0,
@@ -239,7 +287,7 @@
         "method": "POST",
         "ret": "obj",
         "paytoqs": "ignore",
-        "url": "http://localhost:8000/api/iot/telemetry",
+        "url": "http://localhost:3000/iot/telemetry",
         "tls": "",
         "persist": false,
         "proxy": "",
