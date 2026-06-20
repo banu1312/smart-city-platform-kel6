@@ -34,6 +34,16 @@ PUBLISH_INTERVAL = int(os.getenv("PUBLISH_INTERVAL", "30"))
 
 ZONES = ["zone1", "zone2", "zone3", "zone4"]
 
+# Koordinat tetap per zona — disamakan persis dengan kolom location_coordinate
+# di backend/database/seeders/TrashBinSeeder.php (zone1->bin id 1, dst),
+# supaya titik di MQTT payload konsisten dengan data yang sudah di DB.
+ZONE_COORDS = {
+    "zone1": (-6.1944, 106.8318),  # BIN-MNT-001
+    "zone2": (-6.1950, 106.8320),  # BIN-MNT-002
+    "zone3": (-6.2383, 106.8000),  # BIN-KBY-001
+    "zone4": (-6.2390, 106.8010),  # BIN-KBY-002
+}
+
 # Threshold untuk menentukan status tong sampah
 GAS_WARNING_THRESHOLD = 300
 GAS_CRITICAL_THRESHOLD = 500
@@ -49,7 +59,7 @@ ANOMALY_PROBABILITY = 0.05  # 5%
 zone_state = {
     zone: {
         "fill_level": random.uniform(5, 25),
-        "bin_height": random.uniform(80, 150),
+        "bin_height": random.uniform(80, 150),  # tinggi tong random 80-150cm (IOT-3)
     }
     for zone in ZONES
 }
@@ -131,6 +141,7 @@ def build_payload(zone: str) -> dict:
     gas_level, temperature = simulate_gas_and_temp(zone)
     status = determine_status(fill_level, gas_level, temperature)
     calibrated_height = round(zone_state[zone]["bin_height"], 1)
+    lat, lon = ZONE_COORDS[zone]
 
     return {
         "zone": zone,
@@ -140,6 +151,8 @@ def build_payload(zone: str) -> dict:
         "temperature": temperature,
         "calibrated_height": calibrated_height,
         "is_calibration": False,
+        "latitude": lat,
+        "longitude": lon,
         "status": status,
         "timestamp": now.isoformat(),
     }
