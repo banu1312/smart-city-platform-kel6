@@ -1,8 +1,9 @@
 const ZONE_TO_BIN = {
-    zone1: { trash_bin_id: 1, capacity_liters: 100 }, // -> bin_code: BIN-MNT-001
-    zone2: { trash_bin_id: 2, capacity_liters: 80 },  // -> bin_code: BIN-MNT-002
-    zone3: { trash_bin_id: 3, capacity_liters: 120 }, // -> bin_code: BIN-KBY-001
-    zone4: { trash_bin_id: 4, capacity_liters: 100 }, // -> bin_code: BIN-KBY-002
+    zone1: { trash_bin_id: 1, capacity_liters: 100 },
+    zone2: { trash_bin_id: 2, capacity_liters: 80 }, 
+    zone3: { trash_bin_id: 3, capacity_liters: 120 },
+    zone4: { trash_bin_id: 4, capacity_liters: 100 },
+    zone5: { trash_bin_id: 5, capacity_liters: 150 },
 };
 
 const raw = msg.payload;

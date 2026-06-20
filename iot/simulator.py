@@ -23,9 +23,7 @@ from datetime import datetime
 import paho.mqtt.client as mqtt
 from dotenv import load_dotenv
 
-# =============================================================
 # KONFIGURASI
-# =============================================================
 load_dotenv()
 
 MQTT_HOST = os.getenv("MQTT_HOST", "localhost")
@@ -48,12 +46,16 @@ FILL_CRITICAL_THRESHOLD = 95
 ANOMALY_PROBABILITY = 0.05  # 5%
 
 # State fill_level per zona (in-memory, reset setiap simulator restart)
-zone_state = {zone: {"fill_level": random.uniform(5, 25)} for zone in ZONES}
+zone_state = {
+    zone: {
+        "fill_level": random.uniform(5, 25),
+        "bin_height": random.uniform(80, 150),
+    }
+    for zone in ZONES
+}
 
 
-# =============================================================
 # FUNGSI SIMULASI
-# =============================================================
 def bin_id_for(zone: str) -> str:
     """Contoh: zone1 -> BIN-Z1-01"""
     zone_code = zone.replace("zone", "Z")
@@ -128,6 +130,7 @@ def build_payload(zone: str) -> dict:
     fill_level = simulate_fill_level(zone, now.hour)
     gas_level, temperature = simulate_gas_and_temp(zone)
     status = determine_status(fill_level, gas_level, temperature)
+    calibrated_height = round(zone_state[zone]["bin_height"], 1)
 
     return {
         "zone": zone,
@@ -135,14 +138,14 @@ def build_payload(zone: str) -> dict:
         "fill_level": fill_level,
         "gas_level": gas_level,
         "temperature": temperature,
+        "calibrated_height": calibrated_height,
+        "is_calibration": False,
         "status": status,
         "timestamp": now.isoformat(),
     }
 
 
-# =============================================================
 # MQTT CALLBACKS
-# =============================================================
 def on_connect(client, userdata, flags, reason_code, properties):
     if reason_code == 0:
         print(f"[MQTT] Terhubung ke broker {MQTT_HOST}:{MQTT_PORT} sebagai '{MQTT_USERNAME}'")
@@ -154,9 +157,7 @@ def on_disconnect(client, userdata, flags, reason_code, properties):
     print(f"[MQTT] Terputus dari broker (reason_code={reason_code})")
 
 
-# =============================================================
 # MAIN LOOP
-# =============================================================
 def main():
     client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2, client_id="trashtrack-simulator")
     client.username_pw_set(MQTT_USERNAME, MQTT_PASSWORD)
