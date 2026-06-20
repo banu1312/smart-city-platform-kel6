@@ -4,9 +4,12 @@
 
 const char* WIFI_SSID = "Wokwi-GUEST";
 const char* MQTT_BROKER = "broker.hivemq.com";
-const int MQTT_PORT = 1883;
+const int   MQTT_PORT = 1883;
 const char* ZONE_ID = "zone5";
 const char* BIN_ID = "BIN-Z5-01";
+
+const float BIN_LATITUDE = -6.1200;  // sesuaikan dengan location_coordinate bin tujuan
+const float BIN_LONGITUDE = 106.8100;
 
 #define TRIG_PIN 12
 #define ECHO_PIN 14
@@ -14,7 +17,7 @@ const char* BIN_ID = "BIN-Z5-01";
 #define LED_PIN 2
 
 const float MAX_SENSOR_RANGE_CM = 150.0;
-float calibratedHeight = 0;    
+float calibratedHeight = 0;
 
 const float FILL_WARNING = 70.0;
 const float FILL_CRITICAL = 90.0;
@@ -106,17 +109,19 @@ void publishData() {
 
   digitalWrite(LED_PIN, status == "critical" ? HIGH : LOW);
 
-  StaticJsonDocument<320> doc;
+  StaticJsonDocument<384> doc;
   doc["zone"] = ZONE_ID;
   doc["bin_id"] = BIN_ID;
   doc["fill_level"] = (float)((int)(fill * 10)) / 10.0;
   doc["gas_level"] = gas;
   doc["temperature"] = 32.0;
-  doc["calibrated_height"] = calibratedHeight;      
-  doc["is_calibration"] = (millis() < 5000);    
+  doc["calibrated_height"] = calibratedHeight;     
+  doc["is_calibration"] = (millis() < 5000);   
+  doc["latitude"] = BIN_LATITUDE;
+  doc["longitude"] = BIN_LONGITUDE;
   doc["status"] = status;
   doc["timestamp"] = millis();
-  char payload[320];
+  char payload[384];
   serializeJson(doc, payload);
 
   String topic = "city/" + String(ZONE_ID) + "/waste";
