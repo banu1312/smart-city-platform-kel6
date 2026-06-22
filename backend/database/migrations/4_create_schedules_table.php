@@ -7,7 +7,7 @@ return new class extends Migration {
     public function up(): void {
         Schema::create('schedules', function (Blueprint $table) {
             $table->id();
-            $table->unsignedBigInteger('trash_bin_id');
+            $table->unsignedBigInteger('trash_bin_id')->nullable();
             $table->foreignId('truck_id')->constrained('trucks')->onDelete('cascade');
             $table->dateTime('scheduled_at');
             $table->enum('priority_level', ['Low', 'Medium', 'Urgent', 'Critical'])->default('Medium');

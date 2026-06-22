@@ -1,0 +1,371 @@
+[
+    {
+        "id": "df47cc4624cac1c8",
+        "type": "tab",
+        "label": "Flow 1",
+        "disabled": false,
+        "info": "",
+        "env": []
+    },
+    {
+        "id": "f1trashtrack0000001",
+        "type": "tab",
+        "label": "TrashTrack - IoT Bridge (Sprint 2)",
+        "disabled": false,
+        "info": "Pipeline: MQTT (simulator.py) -> Lookup -> Transform -> OAuth token (cached) -> POST ke Gateway /iot/telemetry -> retry handling"
+    },
+    {
+        "id": "cfgmqttbroker0000001",
+        "type": "mqtt-broker",
+        "name": "Mosquitto Lokal",
+        "broker": "localhost",
+        "port": "1883",
+        "clientid": "",
+        "autoConnect": true,
+        "usetls": false,
+        "protocolVersion": "4",
+        "keepalive": "60",
+        "cleansession": true,
+        "autoUnsubscribe": true,
+        "birthTopic": "",
+        "birthQos": "0",
+        "birthPayload": "",
+        "birthMsg": {},
+        "closeTopic": "",
+        "closePayload": "",
+        "closeMsg": {},
+        "willTopic": "",
+        "willQos": "0",
+        "willPayload": "",
+        "willMsg": {},
+        "userProps": "",
+        "sessionExpiry": ""
+    },
+    {
+        "id": "cfgmqttbrokerhivemq01",
+        "type": "mqtt-broker",
+        "name": "HiveMQ Publik (Wokwi)",
+        "broker": "broker.hivemq.com",
+        "port": "1883",
+        "clientid": "",
+        "autoConnect": true,
+        "usetls": false,
+        "protocolVersion": "4",
+        "keepalive": "60",
+        "cleansession": true,
+        "autoUnsubscribe": true,
+        "birthTopic": "",
+        "birthQos": "0",
+        "birthPayload": "",
+        "birthMsg": {},
+        "closeTopic": "",
+        "closePayload": "",
+        "closeMsg": {},
+        "willTopic": "",
+        "willQos": "0",
+        "willPayload": "",
+        "willMsg": {},
+        "userProps": "",
+        "sessionExpiry": ""
+    },
+    {
+        "id": "n1mqttin000000001",
+        "type": "mqtt in",
+        "z": "f1trashtrack0000001",
+        "name": "MQTT In: city/+/waste",
+        "topic": "city/+/waste",
+        "qos": "1",
+        "datatype": "utf8",
+        "broker": "cfgmqttbroker0000001",
+        "nl": false,
+        "rap": true,
+        "rh": 0,
+        "inputs": 0,
+        "x": 140,
+        "y": 100,
+        "wires": [
+            [
+                "n2jsonparse00000001"
+            ]
+        ]
+    },
+    {
+        "id": "n1bmqttinhivemq001",
+        "type": "mqtt in",
+        "z": "f1trashtrack0000001",
+        "name": "MQTT In: city/+/waste (Wokwi/HiveMQ)",
+        "topic": "city/+/waste",
+        "qos": "1",
+        "datatype": "utf8",
+        "broker": "cfgmqttbrokerhivemq01",
+        "nl": false,
+        "rap": true,
+        "rh": 0,
+        "inputs": 0,
+        "x": 150,
+        "y": 150,
+        "wires": [
+            [
+                "n2jsonparse00000001"
+            ]
+        ]
+    },
+    {
+        "id": "n2jsonparse00000001",
+        "type": "json",
+        "z": "f1trashtrack0000001",
+        "name": "JSON Parse",
+        "property": "payload",
+        "action": "",
+        "pretty": false,
+        "x": 330,
+        "y": 100,
+        "wires": [
+            [
+                "n3func1lookup000001"
+            ]
+        ]
+    },
+    {
+        "id": "n3func1lookup000001",
+        "type": "function",
+        "z": "f1trashtrack0000001",
+        "name": "1. Validate Payload",
+        "func": "const raw = msg.payload;\n\nif (!raw || !raw.bin_id || raw.fill_level === undefined) {\n    node.warn(\"Payload tidak lengkap, di-skip: \" + JSON.stringify(raw));\n    return null;\n}\n\nreturn msg;\n",
+        "outputs": 1,
+        "timeout": 0,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 540,
+        "y": 100,
+        "wires": [
+            [
+                "n4func2transform0001"
+            ]
+        ]
+    },
+    {
+        "id": "n4func2transform0001",
+        "type": "function",
+        "z": "f1trashtrack0000001",
+        "name": "2. Forward Payload",
+        "func": "const raw = msg.payload;\n\nmsg.payload = {\n    bin_id: raw.bin_id,\n    fill_level: raw.fill_level,\n    gas_level: raw.gas_level,\n    temperature: raw.temperature,\n    calibrated_height: raw.calibrated_height,\n    is_calibration: raw.is_calibration || false,\n    latitude: raw.latitude,\n    longitude: raw.longitude,\n};\n\nmsg.headers = Object.assign({}, msg.headers, {\n    \"Content-Type\": \"application/json\",\n});\n\nreturn msg;\n",
+        "outputs": 1,
+        "timeout": 0,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 760,
+        "y": 100,
+        "wires": [
+            [
+                "n5func3tokencache001"
+            ]
+        ]
+    },
+    {
+        "id": "n5func3tokencache001",
+        "type": "function",
+        "z": "f1trashtrack0000001",
+        "name": "3. Check Token Cache",
+        "func": "// =============================================================\n// Node-RED Function Node: \"3. Check Token Cache\"\n// TrashTrack - Sprint 2 - Node-RED Data Pipeline Bridge\n//\n// CARA PAKAI DI NODE-RED:\n// 1. Buat node Function baru, beri nama \"3. Check Token Cache\"\n// 2. Copy seluruh isi file ini ke tab \"On Message\"\n// 3. Set \"Outputs\" node ini jadi 1 (default)\n// 4. Sambungkan node ini SETELAH \"2. Transform Payload\"\n// 5. Keluaran node ini dicabangkan ke node Switch:\n//    - msg.needNewToken === true  -> ke node \"Get OAuth Token\" (HTTP Request)\n//    - msg.needNewToken === false -> langsung ke node \"HTTP Request ke Gateway\"\n//    (gunakan node \"Switch\" dengan 2 rule berdasarkan msg.needNewToken)\n//\n// FUNGSI:\n// Token JWT dari oauth-server berlaku 1 jam (JWT_EXPIRES_IN=1h).\n// Supaya Node-RED tidak minta token baru setiap kali ada data MQTT\n// masuk (tiap 30 detik x 4 zona = boros & membebani oauth-server),\n// token disimpan di flow context dan dipakai ulang sampai mendekati\n// expired (kita beri buffer 60 detik sebelum benar-benar expired).\n// =============================================================\n\nconst cachedToken = flow.get(\"iot_access_token\");\nconst expiresAt = flow.get(\"iot_token_expires_at\") || 0;\nconst now = Date.now();\nconst SAFETY_BUFFER_MS = 60 * 1000; // minta token baru 60 detik sebelum expired\n\nif (cachedToken && now < (expiresAt - SAFETY_BUFFER_MS)) {\n    // Token masih valid, langsung pakai dari cache\n    msg.headers = Object.assign({}, msg.headers, {\n        Authorization: \"Bearer \" + cachedToken,\n    });\n    msg.needNewToken = false;\n} else {\n    msg.needNewToken = true;\n}\n\nreturn msg;\n",
+        "outputs": 1,
+        "timeout": 0,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 540,
+        "y": 200,
+        "wires": [
+            [
+                "n6switchtoken0000001"
+            ]
+        ]
+    },
+    {
+        "id": "n6switchtoken0000001",
+        "type": "switch",
+        "z": "f1trashtrack0000001",
+        "name": "needNewToken?",
+        "property": "needNewToken",
+        "propertyType": "msg",
+        "rules": [
+            {
+                "t": "true"
+            },
+            {
+                "t": "false"
+            }
+        ],
+        "checkall": "true",
+        "repair": false,
+        "outputs": 2,
+        "x": 760,
+        "y": 200,
+        "wires": [
+            [
+                "n7func4preptoken0001"
+            ],
+            [
+                "n10httpgateway000001"
+            ]
+        ]
+    },
+    {
+        "id": "n7func4preptoken0001",
+        "type": "function",
+        "z": "f1trashtrack0000001",
+        "name": "4. Prepare Token Request",
+        "func": "// =============================================================\n// Node-RED Function Node: \"4. Prepare Token Request\"\n// TrashTrack - Sprint 2 - Node-RED Data Pipeline Bridge\n//\n// CARA PAKAI DI NODE-RED:\n// 1. Buat node Function baru, beri nama \"4. Prepare Token Request\"\n// 2. Copy seluruh isi file ini ke tab \"On Message\"\n// 3. Sambungkan dari cabang \"needNewToken === true\" (lihat node\n//    Switch setelah \"3. Check Token Cache\")\n// 4. Setelah node ini, sambungkan ke node \"HTTP Request\" yang\n//    method-nya POST, URL = env.OAUTH_URL (gunakan node\n//    \"Get OAuth Token\")\n//\n// FUNGSI:\n// Menyiapkan msg.payload & msg.headers untuk request\n// POST /oauth/token dengan grant_type=client_credentials,\n// memakai kredensial client \"iot-device\" (lihat\n// oauth-server/src/models/tokenStore.js).\n//\n// PENTING: msg asli (payload telemetry yang sudah ditransform)\n// disimpan dulu ke msg._originalMsg supaya tidak hilang — nanti\n// dikembalikan oleh node \"5. Store Token & Resume\" setelah token\n// baru diterima.\n// =============================================================\n\n// Simpan payload telemetry asli supaya tidak tertimpa\nmsg._originalPayload = msg.payload;\nmsg._originalHeaders = msg.headers;\n\nmsg.payload = {\n    grant_type: \"client_credentials\",\n    client_id: env.get(\"OAUTH_CLIENT_ID\") || \"iot-device\",\n    client_secret: env.get(\"OAUTH_CLIENT_SECRET\") || \"iot-secret\",\n    scope: \"service\",\n};\n\nmsg.headers = {\n    \"Content-Type\": \"application/json\",\n};\n\nreturn msg;\n",
+        "outputs": 1,
+        "timeout": 0,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 540,
+        "y": 280,
+        "wires": [
+            [
+                "n8httpoauth00000001"
+            ]
+        ]
+    },
+    {
+        "id": "n8httpoauth00000001",
+        "type": "http request",
+        "z": "f1trashtrack0000001",
+        "name": "Get OAuth Token (POST OAUTH_URL)",
+        "method": "POST",
+        "ret": "obj",
+        "paytoqs": "ignore",
+        "url": "${OAUTH_URL}",
+        "tls": "",
+        "persist": false,
+        "proxy": "",
+        "insecureHTTPParser": false,
+        "authType": "",
+        "senderr": false,
+        "headers": [],
+        "x": 440,
+        "y": 360,
+        "wires": [
+            [
+                "n9func5storetoken001"
+            ]
+        ]
+    },
+    {
+        "id": "n9func5storetoken001",
+        "type": "function",
+        "z": "f1trashtrack0000001",
+        "name": "5. Store Token & Resume",
+        "func": "const body = msg.payload;\n\nif (!body || body.status !== \"success\" || !body.data || !body.data.access_token) {\n    node.error(\"Gagal mendapatkan token dari OAuth server: \" + JSON.stringify(body));\n    msg.payload = msg._originalPayload;\n    msg.headers = msg._originalHeaders || {};\n    delete msg._originalPayload;\n    delete msg._originalHeaders;\n    msg.statusCode = 503;\n    return msg;\n}\n\nconst accessToken = body.data.access_token;\nconst expiresInSec = body.data.expires_in || 3600;\nconst expiresAt = Date.now() + expiresInSec * 1000;\n\nflow.set(\"iot_access_token\", accessToken);\nflow.set(\"iot_token_expires_at\", expiresAt);\n\nnode.log(`Token IoT baru diperoleh, berlaku ${expiresInSec} detik.`);\n\nmsg.payload = msg._originalPayload;\nmsg.headers = Object.assign({}, msg._originalHeaders, {\n    Authorization: \"Bearer \" + accessToken,\n});\n\ndelete msg._originalPayload;\ndelete msg._originalHeaders;\n\nreturn msg;\n",
+        "outputs": 1,
+        "timeout": 0,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 760,
+        "y": 360,
+        "wires": [
+            [
+                "n10httpgateway000001"
+            ]
+        ]
+    },
+    {
+        "id": "n10httpgateway000001",
+        "type": "http request",
+        "z": "f1trashtrack0000001",
+        "name": "POST ke Gateway /iot/telemetry",
+        "method": "POST",
+        "ret": "obj",
+        "paytoqs": "ignore",
+        "url": "${GATEWAY_URL}",
+        "tls": "",
+        "persist": false,
+        "proxy": "",
+        "insecureHTTPParser": false,
+        "authType": "",
+        "senderr": false,
+        "headers": [],
+        "x": 990,
+        "y": 260,
+        "wires": [
+            [
+                "n11func6checkresp001"
+            ]
+        ]
+    },
+    {
+        "id": "n11func6checkresp001",
+        "type": "function",
+        "z": "f1trashtrack0000001",
+        "name": "6. Check Response & Retry",
+        "func": "const statusCode = msg.statusCode;\nconst MAX_RETRY = 5;\n\nmsg.retryCount = (msg.retryCount || 0) + 1;\n\nif (statusCode === 200 || statusCode === 201) {\n    node.status({ fill: \"green\", shape: \"dot\", text: \"OK \" + statusCode });\n    return [msg, null];\n}\n\nconst isRetryableError = statusCode === 401 || statusCode === 502 || statusCode === 503 || statusCode === undefined;\n\nif (isRetryableError && msg.retryCount <= MAX_RETRY) {\n    if (statusCode === 401) {\n        flow.set(\"iot_access_token\", null);\n        flow.set(\"iot_token_expires_at\", 0);\n    }\n    node.warn(`Response ${statusCode}, retry ke-${msg.retryCount} dalam 60 detik...`);\n    node.status({ fill: \"yellow\", shape: \"ring\", text: `retry ${msg.retryCount}/${MAX_RETRY}` });\n    return [null, msg];\n}\n\nnode.error(`Gagal kirim telemetry setelah ${msg.retryCount} percobaan, status=${statusCode}: ` +\n    JSON.stringify(msg.payload));\nnode.status({ fill: \"red\", shape: \"dot\", text: \"FAILED \" + statusCode });\nreturn [null, null];\n",
+        "outputs": 2,
+        "timeout": 0,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 1020,
+        "y": 340,
+        "wires": [
+            [
+                "n12debugok000000001"
+            ],
+            [
+                "n13delayretry0000001"
+            ]
+        ]
+    },
+    {
+        "id": "n12debugok000000001",
+        "type": "debug",
+        "z": "f1trashtrack0000001",
+        "name": "Sukses",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "true",
+        "targetType": "full",
+        "statusVal": "",
+        "statusType": "auto",
+        "x": 1200,
+        "y": 300,
+        "wires": []
+    },
+    {
+        "id": "n13delayretry0000001",
+        "type": "delay",
+        "z": "f1trashtrack0000001",
+        "name": "Retry 60s",
+        "pauseType": "delay",
+        "timeout": "60",
+        "timeoutUnits": "seconds",
+        "rate": "1",
+        "nbRateUnits": "1",
+        "rateUnits": "second",
+        "randomFirst": "1",
+        "randomLast": "5",
+        "randomUnits": "seconds",
+        "drop": false,
+        "allowrate": false,
+        "outputs": 1,
+        "x": 1010,
+        "y": 420,
+        "wires": [
+            [
+                "n10httpgateway000001"
+            ]
+        ]
+    }
+]

@@ -6,14 +6,19 @@ use Illuminate\Database\Eloquent\Model;
 class TrashBin extends Model {
     protected $table    = 'trash_bins';
     protected $fillable = [
-        'bin_code', 'capacity_liters', 'current_volume_percentage',
-        'methane_gas_level', 'status', 'location_coordinate', 'last_pickup'
+        'bin_code', 'capacity_liters', 'tinggi', 'current_volume_percentage',
+        'methane_gas_level', 'temperature', 'tipe_lokasi', 'status',
+        'latitude', 'longitude', 'last_pickup'
     ];
 
     protected $casts = [
         'last_pickup'               => 'datetime',
         'current_volume_percentage' => 'float',
         'methane_gas_level'         => 'float',
+        'temperature'               => 'float',
+        'latitude'                  => 'double',
+        'longitude'                 => 'double',
+        'tinggi'                    => 'float',
     ];
 
     public function sensorLogs() {

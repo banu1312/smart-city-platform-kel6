@@ -1,9 +1,12 @@
 import logging
 from contextlib import asynccontextmanager
+from pathlib import Path
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field
 import joblib
 import pandas as pd
+
+BASE_DIR = Path(__file__).resolve().parent
 
 # Setup Logger
 logging.basicConfig(level=logging.INFO)
@@ -18,9 +21,9 @@ async def lifespan(app: FastAPI):
     try:
         logger.info("Loading ML models into memory...")
         # UPDATE 1: Sesuaikan nama file dengan hasil training terakhir kita
-        ml_models['fill_rate'] = joblib.load('./models/fill_rate_model.pkl')
-        ml_models['priority'] = joblib.load('./models/priority_model.pkl')
-        ml_models['anomaly'] = joblib.load('./models/anomaly_model.pkl')
+        ml_models['fill_rate'] = joblib.load(BASE_DIR / 'models' / 'fill_rate_model.pkl')
+        ml_models['priority'] = joblib.load(BASE_DIR / 'models' / 'priority_model.pkl')
+        ml_models['anomaly'] = joblib.load(BASE_DIR / 'models' / 'anomaly_model.pkl')
         logger.info("All models loaded successfully!")
         yield
     except Exception as e:
@@ -33,14 +36,13 @@ app = FastAPI(title="TrashTrack AI Inference Service", lifespan=lifespan)
 
 # --- Pydantic Data Schemas ---
 
-# UPDATE 2: Tambahkan fitur lokasi, weekend, dan event agar sesuai dengan pipeline Model 1
 class FillRateRequest(BaseModel):
     jam: int = Field(..., ge=0, le=23, description="Jam saat ini (0-23)")
     suhu_cuaca: float = Field(..., description="Suhu cuaca di luar (Celcius)")
     volume_sekarang: float = Field(..., ge=0, le=100, description="Persentase volume (0-100)")
-    tipe_lokasi: str = Field(..., description="Pilihan: 'Pasar', 'Taman', atau 'Perumahan'")
+    latitude: float = Field(..., description="Latitude lokasi tong sampah")
+    longitude: float = Field(..., description="Longitude lokasi tong sampah")
     is_weekend: int = Field(..., ge=0, le=1, description="1 jika Sabtu/Minggu, 0 jika hari biasa")
-    ada_event: int = Field(..., ge=0, le=1, description="1 jika ada event/keramaian, 0 jika tidak")
 
 class PriorityRequest(BaseModel):
     volume_sekarang: float = Field(..., ge=0, le=100)

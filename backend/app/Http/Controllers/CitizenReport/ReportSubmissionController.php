@@ -10,11 +10,6 @@ use App\Models\SanitationReport;
 use App\Services\RabbitMQPublisher;
 
 class ReportSubmissionController extends Controller {
-    private RabbitMQPublisher $publisher;
-
-    public function __construct() {
-        $this->publisher = new RabbitMQPublisher();
-    }
 
     // POST /api/reports
     public function store(StoreReportRequest $request): JsonResponse {
@@ -35,7 +30,8 @@ class ReportSubmissionController extends Controller {
         ]);
 
         try {
-            $this->publisher->publish('report.submitted', [
+            $publisher = new RabbitMQPublisher();
+            $publisher->publish('report.submitted', [
                 'report_id'      => $report->id,
                 'reporter_name'  => $report->reporter_name,
                 'geo_coordinate' => $report->geo_coordinate,

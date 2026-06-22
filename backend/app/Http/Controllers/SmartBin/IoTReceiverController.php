@@ -5,96 +5,102 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Routing\Controller;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Log;
 use App\Http\Requests\StoreTelemetryRequest;
 use App\Models\TrashBin;
 use App\Models\SensorLog;
+use App\Models\Truck;
+use App\Models\Schedule;
 use App\Services\RabbitMQPublisher;
+use App\Services\MLClient;
 
 class IoTReceiverController extends Controller {
-    private ?RabbitMQPublisher $publisher = null;
 
-    public function __construct() {
-        // RabbitMQ tidak diinisialisasi di sini supaya tidak crash saat RabbitMQ tidak tersedia
-    }
-
-    // POST /api/iot/telemetry (ini yang bakal ditembak node-RED setiap 30 detik)
     public function storeTelemetry(StoreTelemetryRequest $request): JsonResponse {
         DB::beginTransaction();
 
         try {
-            $bin = TrashBin::findOrFail($request->trash_bin_id);
+            $bin = TrashBin::where('bin_code', $request->bin_id)->firstOrFail();
 
-            // ngambil log sebelumnya untuk hitung delta_volume
+            // Update tinggi dari calibrated_height
+            if ($request->calibrated_height) {
+                $bin->tinggi = $request->calibrated_height;
+            }
+
+            // Update koordinat
+            if ($request->latitude !== null) {
+                $bin->latitude = $request->latitude;
+            }
+            if ($request->longitude !== null) {
+                $bin->longitude = $request->longitude;
+            }
+
+            // fill_level dari IoT langsung jadi current_volume_percentage
+            $volumePct = round(max(0, min(100, $request->fill_level)), 2);
+
+            // Hitung distance_cm dari fill_level + tinggi (untuk sensor_logs)
+            $binHeightCm = $bin->tinggi > 0 ? $bin->tinggi : 100;
+            $distanceCm  = round($binHeightCm * (1 - $volumePct / 100), 2);
+
+            // Delta volume dari log sebelumnya
             $prevLog = SensorLog::where('trash_bin_id', $bin->id)
                 ->orderBy('recorded_at', 'desc')
                 ->first();
 
-            // kalkulasi current_volume_percentage dari distance_cm
-            // rumus: tinggi tong (misal 100cm) - jarak sensor = tinggi sampah
-            // jarak 20cm = sampah setinggi 80cm = 80% penuh
-            $binHeightCm        = $bin->capacity_liters > 0
-                                    ? $bin->capacity_liters / 1  // asumsi 1 liter per cm
-                                    : 100;
-            $volumePct          = round((($binHeightCm - $request->distance_cm) / $binHeightCm) * 100, 2);
-            $volumePct          = max(0, min(100, $volumePct));
-
-            // hitung delta_volume (perubahan volume dari log sebelumnya)
             $deltaVolume = null;
             if ($prevLog) {
-                $prevVolumePct   = round((($binHeightCm - $prevLog->distance_cm) / $binHeightCm) * 100, 2);
-                $deltaVolume     = round($volumePct - $prevVolumePct, 2);
+                $deltaVolume = round($volumePct - ($bin->current_volume_percentage ?? 0), 2);
             }
 
-            // simpan ke sensor_logs
             $log = SensorLog::create([
-                'trash_bin_id' => $bin->id,
-                'distance_cm'  => $request->distance_cm,
-                'methane_ppm'  => $request->methane_ppm,
-                'temperature_c'=> $request->temperature_c,
-                'delta_volume' => $deltaVolume,
-                'raw_payload'  => $request->raw_payload ?? $request->all(),
+                'trash_bin_id'  => $bin->id,
+                'distance_cm'   => $distanceCm,
+                'methane_ppm'   => $request->gas_level,
+                'temperature_c' => $request->temperature,
+                'delta_volume'  => $deltaVolume,
+                'raw_payload'   => $request->all(),
             ]);
 
-            // update trash_bins dengan nilai terbaru
+            // Update trash_bins kolom sesuai mapping
             $bin->current_volume_percentage = $volumePct;
-            $bin->methane_gas_level         = $request->methane_ppm ?? $bin->methane_gas_level;
+            $bin->methane_gas_level         = $request->gas_level ?? $bin->methane_gas_level;
+            $bin->temperature               = $request->temperature;
             $bin->save();
 
             DB::commit();
 
-            // Bersihkan cache
             Cache::forget('bins.all');
             Cache::forget("bins.{$bin->id}");
 
-            // publish bin.updated ke RabbitMQ — Python ML consume ini
-            $payload = [
+            // RabbitMQ
+            $rabbitPayload = [
                 'trash_bin_id'              => $bin->id,
                 'bin_code'                  => $bin->bin_code,
                 'current_volume_percentage' => $volumePct,
-                'methane_gas_level'         => $request->methane_ppm,
-                'temperature_c'             => $request->temperature_c,
+                'methane_gas_level'         => $request->gas_level,
+                'temperature'               => $request->temperature,
                 'delta_volume'              => $deltaVolume,
-                'distance_cm'               => $request->distance_cm,
+                'distance_cm'               => $distanceCm,
+                'tinggi'                    => $bin->tinggi,
+                'latitude'                  => $bin->latitude,
+                'longitude'                 => $bin->longitude,
                 'timestamp'                 => now()->toIso8601String(),
             ];
 
             try {
-                // baru diinisialisasi di sini supaya kalau gagal, ditangkap try-catch ini
-                $this->publisher = new RabbitMQPublisher();
+                $publisher = new RabbitMQPublisher();
+                $publisher->publish('bin.updated', $rabbitPayload);
 
-                // selalu publish bin.updated untuk ML consume
-                $this->publisher->publish('bin.updated', $payload);
-
-                // rule 1: vandalisme atau kebakaran (anomali)
-                // delta_volume < -5 = sampah tiba-tiba berkurang (mungkin dibakar/dicuri)
-                // temperature_c > 36 = panas tidak wajar
                 if (($deltaVolume !== null && $deltaVolume < -5) ||
-                    ($request->temperature_c !== null && $request->temperature_c > 36)) {
-                    $this->publisher->publish('vandalism.alert', $payload);
+                    ($request->temperature !== null && $request->temperature > 36)) {
+                    $publisher->publish('vandalism.alert', $rabbitPayload);
                 }
             } catch (\Exception $e) {
-                error_log('[RabbitMQ Error] ' . $e->getMessage());
+                report($e);
             }
+
+            // ML Integration
+            $mlResult = $this->runMLPredictions($bin, $volumePct, $request->gas_level, $distanceCm, $deltaVolume, $request->temperature);
 
             return response()->json([
                 'status'    => 'success',
@@ -104,6 +110,8 @@ class IoTReceiverController extends Controller {
                     'current_volume_percentage' => $volumePct,
                     'delta_volume'              => $deltaVolume,
                     'bin_status'                => $bin->status,
+                    'tinggi'                    => $bin->tinggi,
+                    'ml_predictions'            => $mlResult,
                 ],
                 'message'   => 'Telemetry stored successfully',
                 'timestamp' => now()->toIso8601String(),
@@ -119,6 +127,94 @@ class IoTReceiverController extends Controller {
                 'timestamp' => now()->toIso8601String(),
                 'service'   => 'smart-bin-service',
             ], 500);
+        }
+    }
+
+    private function runMLPredictions(TrashBin $bin, float $volumePct, ?float $gasLevel, float $distanceCm, ?float $deltaVolume, ?float $temperature): array {
+        $result = ['fill_rate' => null, 'priority' => null, 'anomaly' => null, 'dispatch' => null];
+
+        try {
+            $ml = new MLClient();
+
+            $hoursUntilFull = $ml->predictFillRate([
+                'jam'             => (int) now()->format('H'),
+                'suhu_cuaca'      => $temperature ?? 30.0,
+                'volume_sekarang' => $volumePct,
+                'latitude'        => $bin->latitude ?? -6.2,
+                'longitude'       => $bin->longitude ?? 106.8,
+                'is_weekend'      => now()->isWeekend() ? 1 : 0,
+            ]);
+            $result['fill_rate'] = $hoursUntilFull;
+
+            $priority = $ml->predictPriority([
+                'volume_sekarang' => $volumePct,
+                'kadar_metana'    => $gasLevel ?? 0,
+                'laporan_warga'   => 0,
+            ]);
+            $result['priority'] = $priority;
+
+            $isAnomaly = $ml->detectAnomaly([
+                'jarak_ultrasonik' => $distanceCm,
+                'delta_volume_sec' => $deltaVolume ?? 0,
+                'suhu_cuaca'       => $temperature ?? 30.0,
+            ]);
+            $result['anomaly'] = $isAnomaly;
+
+            if ($hoursUntilFull !== null && $priority !== null && in_array($priority, ['Urgent', 'Critical'])) {
+                $result['dispatch'] = $this->tryAutoDispatch($bin->id, $priority, $hoursUntilFull);
+            }
+
+        } catch (\Exception $e) {
+            report($e);
+        }
+
+        return $result;
+    }
+
+    private function tryAutoDispatch(int $trashBinId, string $priority, float $hoursUntilFull): ?array {
+        $alreadyPending = Schedule::where('trash_bin_id', $trashBinId)
+            ->whereIn('execution_status', ['Pending', 'In-Progress'])
+            ->exists();
+
+        if ($alreadyPending) {
+            return ['skipped' => 'Schedule already exists for this bin'];
+        }
+
+        $truck = Truck::where('current_status', 'Available')->first();
+
+        if (! $truck) {
+            return ['skipped' => 'No available trucks'];
+        }
+
+        DB::beginTransaction();
+        try {
+            $schedule = Schedule::create([
+                'trash_bin_id'        => $trashBinId,
+                'truck_id'            => $truck->id,
+                'scheduled_at'        => now()->addHours($hoursUntilFull),
+                'priority_level'      => $priority,
+                'execution_status'    => 'Pending',
+                'estimated_hours_full' => $hoursUntilFull,
+            ]);
+
+            $truck->current_status = 'On-Route';
+            $truck->save();
+
+            DB::commit();
+
+            Log::info("[AutoDispatch] Bin {$trashBinId} → Truck {$truck->license_plate}, priority={$priority}, ETA={$hoursUntilFull}h");
+
+            return [
+                'schedule_id' => $schedule->id,
+                'truck'       => $truck->license_plate,
+                'driver'      => $truck->driver_name,
+                'priority'    => $priority,
+                'eta_hours'   => $hoursUntilFull,
+            ];
+        } catch (\Exception $e) {
+            DB::rollBack();
+            report($e);
+            return ['error' => 'Dispatch failed'];
         }
     }
 }

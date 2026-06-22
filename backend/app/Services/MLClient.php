@@ -8,7 +8,7 @@ class MLClient {
     private string $baseUrl;
 
     public function __construct() {
-        $this->baseUrl = env('ML_SERVICE_URL', 'http://python-ml:5000');
+        $this->baseUrl = config('services.ml.url');
     }
 
     /**
@@ -18,12 +18,12 @@ class MLClient {
     public function predictFillRate(array $data): ?float {
         try {
             $response = Http::timeout(5)->post("{$this->baseUrl}/predict/fill-rate", [
-                'jam'            => $data['jam'],
-                'suhu_cuaca'     => $data['suhu_cuaca'],
-                'volume_sekarang'=> $data['volume_sekarang'],
-                'tipe_lokasi'    => $data['tipe_lokasi']   ?? 'Perumahan',
-                'is_weekend'     => $data['is_weekend']    ?? 0,
-                'ada_event'      => $data['ada_event']     ?? 0,
+                'jam'             => $data['jam'],
+                'suhu_cuaca'      => $data['suhu_cuaca'],
+                'volume_sekarang' => $data['volume_sekarang'],
+                'latitude'        => $data['latitude'],
+                'longitude'       => $data['longitude'],
+                'is_weekend'      => $data['is_weekend'] ?? 0,
             ]);
 
             if ($response->successful()) {

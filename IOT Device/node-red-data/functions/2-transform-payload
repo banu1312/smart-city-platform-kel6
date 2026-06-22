@@ -1,0 +1,18 @@
+const raw = msg.payload;
+
+msg.payload = {
+    bin_id: raw.bin_id,
+    fill_level: raw.fill_level,
+    gas_level: raw.gas_level,
+    temperature: raw.temperature,
+    calibrated_height: raw.calibrated_height,
+    is_calibration: raw.is_calibration || false,
+    latitude: raw.latitude,
+    longitude: raw.longitude,
+};
+
+msg.headers = Object.assign({}, msg.headers, {
+    "Content-Type": "application/json",
+});
+
+return msg;

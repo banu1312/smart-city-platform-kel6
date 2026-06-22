@@ -29,8 +29,12 @@ class Schedule extends Model {
         $this->execution_status = $newStatus;
 
         if ($newStatus === 'Completed') {
-            // update last_pickup di trash_bin
-            $this->trashBin?->update(['last_pickup' => now()]);
+            $this->trashBin?->update([
+                'last_pickup' => now(),
+                'current_volume_percentage' => 0,
+                'methane_gas_level' => 0,
+                'temperature' => null,
+            ]);
         }
 
         return $this->save();

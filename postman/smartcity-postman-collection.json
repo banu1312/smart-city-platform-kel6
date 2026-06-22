@@ -1,1003 +1,384 @@
 {
 	"info": {
-		"_postman_id": "smartcity-platform-sprint1",
-		"name": "Smart City Platform",
-		"description": "Smart City Integrated Platform — API Collection\nSprint 1: OAuth Server & API Gateway\n\nCara pakai:\n1. Import collection ini\n2. Import environment 'Smart City - Local'\n3. Aktifkan environment\n4. Jalankan 'Password Grant' dulu agar accessToken terisi otomatis\n5. Jalankan request lainnya sesuai urutan",
+		"_postman_id": "smartcity-platform-full",
+		"name": "TrashTrack Smart City Platform",
+		"description": "Full API Collection — OAuth, Smart Bin, Fleet, Citizen Report, ML, IoT\n\nCara pakai:\n1. Import collection + environment\n2. Aktifkan environment 'Smart City - Local'\n3. Jalankan '1. Login Admin' dulu\n4. Jalankan '2. IoT Token' untuk test telemetry\n5. Test sisanya sesuai urutan folder",
 		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
 	},
 	"variable": [],
 	"item": [
 		{
-			"name": "OAuth Server (port 3002)",
-			"description": "Semua endpoint langsung ke OAuth Server di port 3002",
+			"name": "0. Health Check",
 			"item": [
 				{
-					"name": "Health Check",
+					"name": "Gateway Health",
 					"request": {
 						"method": "GET",
 						"header": [],
-						"url": {
-							"raw": "{{oauthUrl}}/health",
-							"host": ["{{oauthUrl}}"],
-							"path": ["health"]
-						},
-						"description": "Cek apakah OAuth Server berjalan"
+						"url": { "raw": "{{baseUrl}}/health", "host": ["{{baseUrl}}"], "path": ["health"] }
 					},
-					"event": [
-						{
-							"listen": "test",
-							"script": {
-								"type": "text/javascript",
-								"exec": [
-									"const json = pm.response.json();",
-									"",
-									"pm.test('Status code is 200', () => {",
-									"  pm.response.to.have.status(200);",
-									"});",
-									"",
-									"pm.test('Status is success', () => {",
-									"  pm.expect(json.status).to.equal('success');",
-									"});",
-									"",
-									"pm.test('Service is oauth-server', () => {",
-									"  pm.expect(json.service).to.equal('oauth-server');",
-									"});",
-									"",
-									"pm.test('Has timestamp', () => {",
-									"  pm.expect(json).to.have.property('timestamp');",
-									"});"
-								]
-							}
-						}
-					],
-					"response": [
-						{
-							"name": "200 OK",
-							"status": "OK",
-							"code": 200,
-							"body": "{\n  \"status\": \"success\",\n  \"code\": 200,\n  \"message\": \"OAuth Server is running\",\n  \"service\": \"oauth-server\",\n  \"timestamp\": \"2026-06-13T00:00:00.000Z\"\n}"
-						}
-					]
+					"event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+						"pm.test('Status 200', () => pm.response.to.have.status(200));",
+						"pm.test('Gateway OK', () => pm.expect(pm.response.json().data.gateway).to.equal('ok'));"
+					]}}]
 				},
 				{
-					"name": "Password Grant",
+					"name": "OAuth Health",
 					"request": {
-						"method": "POST",
-						"header": [
-							{
-								"key": "Content-Type",
-								"value": "application/json"
-							}
-						],
-						"body": {
-							"mode": "raw",
-							"raw": "{\n  \"grant_type\": \"password\",\n  \"client_id\": \"{{clientId}}\",\n  \"client_secret\": \"{{clientSecret}}\",\n  \"username\": \"admin\",\n  \"password\": \"admin123\"\n}",
-							"options": {
-								"raw": {
-									"language": "json"
-								}
-							}
-						},
-						"url": {
-							"raw": "{{oauthUrl}}/oauth/token",
-							"host": ["{{oauthUrl}}"],
-							"path": ["oauth", "token"]
-						},
-						"description": "Login sebagai user (admin/warga). Menghasilkan access_token + refresh_token.\nToken akan otomatis tersimpan ke environment variable."
+						"method": "GET",
+						"header": [],
+						"url": { "raw": "{{oauthUrl}}/health", "host": ["{{oauthUrl}}"], "path": ["health"] }
 					},
-					"event": [
-						{
-							"listen": "test",
-							"script": {
-								"type": "text/javascript",
-								"exec": [
-									"const json = pm.response.json();",
-									"",
-									"pm.test('Status code is 200', () => {",
-									"  pm.response.to.have.status(200);",
-									"});",
-									"",
-									"pm.test('Has access_token', () => {",
-									"  pm.expect(json.data).to.have.property('access_token');",
-									"});",
-									"",
-									"pm.test('Has refresh_token', () => {",
-									"  pm.expect(json.data).to.have.property('refresh_token');",
-									"});",
-									"",
-									"pm.test('token_type is Bearer', () => {",
-									"  pm.expect(json.data.token_type).to.equal('Bearer');",
-									"});",
-									"",
-									"pm.test('expires_in is 3600', () => {",
-									"  pm.expect(json.data.expires_in).to.equal(3600);",
-									"});",
-									"",
-									"pm.test('Service is oauth-server', () => {",
-									"  pm.expect(json.service).to.equal('oauth-server');",
-									"});",
-									"",
-									"if (json.data && json.data.access_token) {",
-									"  pm.environment.set('accessToken', json.data.access_token);",
-									"  console.log('✅ accessToken saved to environment');",
-									"}",
-									"",
-									"if (json.data && json.data.refresh_token) {",
-									"  pm.environment.set('refreshToken', json.data.refresh_token);",
-									"  console.log('✅ refreshToken saved to environment');",
-									"}"
-								]
-							}
-						}
-					],
-					"response": [
-						{
-							"name": "200 OK",
-							"status": "OK",
-							"code": 200,
-							"body": "{\n  \"status\": \"success\",\n  \"code\": 200,\n  \"data\": {\n    \"access_token\": \"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...\",\n    \"token_type\": \"Bearer\",\n    \"expires_in\": 3600,\n    \"refresh_token\": \"uuid-uuid-uuid...\",\n    \"scope\": \"read write\"\n  },\n  \"message\": \"Token issued successfully\",\n  \"service\": \"oauth-server\",\n  \"timestamp\": \"2026-06-13T00:00:00.000Z\"\n}"
-						},
-						{
-							"name": "401 Wrong Password",
-							"status": "Unauthorized",
-							"code": 401,
-							"body": "{\n  \"status\": \"error\",\n  \"code\": 401,\n  \"message\": \"Invalid username or password\",\n  \"service\": \"oauth-server\",\n  \"timestamp\": \"2026-06-13T00:00:00.000Z\"\n}"
-						}
-					]
+					"event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+						"pm.test('Status 200', () => pm.response.to.have.status(200));",
+						"pm.test('OAuth running', () => pm.expect(pm.response.json().service).to.equal('oauth-server'));"
+					]}}]
 				},
 				{
-					"name": "Password Grant (warga1)",
+					"name": "ML Health",
 					"request": {
-						"method": "POST",
-						"header": [
-							{
-								"key": "Content-Type",
-								"value": "application/json"
-							}
-						],
-						"body": {
-							"mode": "raw",
-							"raw": "{\n  \"grant_type\": \"password\",\n  \"client_id\": \"{{clientId}}\",\n  \"client_secret\": \"{{clientSecret}}\",\n  \"username\": \"warga1\",\n  \"password\": \"warga123\"\n}",
-							"options": {
-								"raw": {
-									"language": "json"
-								}
-							}
-						},
-						"url": {
-							"raw": "{{oauthUrl}}/oauth/token",
-							"host": ["{{oauthUrl}}"],
-							"path": ["oauth", "token"]
-						},
-						"description": "Login sebagai warga biasa (role: citizen)"
+						"method": "GET",
+						"header": [],
+						"url": { "raw": "http://localhost:5000/health", "host": ["http://localhost:5000"], "path": ["health"] }
 					},
-					"event": [
-						{
-							"listen": "test",
-							"script": {
-								"type": "text/javascript",
-								"exec": [
-									"const json = pm.response.json();",
-									"",
-									"pm.test('Status code is 200', () => {",
-									"  pm.response.to.have.status(200);",
-									"});",
-									"",
-									"pm.test('Has access_token', () => {",
-									"  pm.expect(json.data).to.have.property('access_token');",
-									"});",
-									"",
-									"if (json.data && json.data.access_token) {",
-									"  pm.environment.set('accessTokenWarga', json.data.access_token);",
-									"  console.log('✅ accessTokenWarga saved to environment');",
-									"}"
-								]
-							}
-						}
-					],
-					"response": []
-				},
-				{
-					"name": "Client Credentials Grant (IoT)",
-					"request": {
-						"method": "POST",
-						"header": [
-							{
-								"key": "Content-Type",
-								"value": "application/json"
-							}
-						],
-						"body": {
-							"mode": "raw",
-							"raw": "{\n  \"grant_type\": \"client_credentials\",\n  \"client_id\": \"iot-device\",\n  \"client_secret\": \"iot-secret\"\n}",
-							"options": {
-								"raw": {
-									"language": "json"
-								}
-							}
-						},
-						"url": {
-							"raw": "{{oauthUrl}}/oauth/token",
-							"host": ["{{oauthUrl}}"],
-							"path": ["oauth", "token"]
-						},
-						"description": "Token untuk IoT device / komunikasi antar service. Tidak menghasilkan refresh_token."
-					},
-					"event": [
-						{
-							"listen": "test",
-							"script": {
-								"type": "text/javascript",
-								"exec": [
-									"const json = pm.response.json();",
-									"",
-									"pm.test('Status code is 200', () => {",
-									"  pm.response.to.have.status(200);",
-									"});",
-									"",
-									"pm.test('Has access_token', () => {",
-									"  pm.expect(json.data).to.have.property('access_token');",
-									"});",
-									"",
-									"pm.test('No refresh_token (expected untuk client_credentials)', () => {",
-									"  pm.expect(json.data).to.not.have.property('refresh_token');",
-									"});",
-									"",
-									"pm.test('Scope is service', () => {",
-									"  pm.expect(json.data.scope).to.equal('service');",
-									"});",
-									"",
-									"if (json.data && json.data.access_token) {",
-									"  pm.environment.set('iotToken', json.data.access_token);",
-									"  console.log('✅ iotToken saved to environment');",
-									"}"
-								]
-							}
-						}
-					],
-					"response": [
-						{
-							"name": "200 OK",
-							"status": "OK",
-							"code": 200,
-							"body": "{\n  \"status\": \"success\",\n  \"code\": 200,\n  \"data\": {\n    \"access_token\": \"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...\",\n    \"token_type\": \"Bearer\",\n    \"expires_in\": 3600,\n    \"scope\": \"service\"\n  },\n  \"message\": \"Token issued successfully\",\n  \"service\": \"oauth-server\",\n  \"timestamp\": \"2026-06-13T00:00:00.000Z\"\n}"
-						}
-					]
-				},
-				{
-					"name": "Refresh Token Grant",
-					"request": {
-						"method": "POST",
-						"header": [
-							{
-								"key": "Content-Type",
-								"value": "application/json"
-							}
-						],
-						"body": {
-							"mode": "raw",
-							"raw": "{\n  \"grant_type\": \"refresh_token\",\n  \"client_id\": \"{{clientId}}\",\n  \"client_secret\": \"{{clientSecret}}\",\n  \"refresh_token\": \"{{refreshToken}}\"\n}",
-							"options": {
-								"raw": {
-									"language": "json"
-								}
-							}
-						},
-						"url": {
-							"raw": "{{oauthUrl}}/oauth/token",
-							"host": ["{{oauthUrl}}"],
-							"path": ["oauth", "token"]
-						},
-						"description": "Perpanjang sesi tanpa login ulang. Jalankan 'Password Grant' dulu agar {{refreshToken}} terisi.\nToken lama akan di-rotate (dihapus), token baru diterbitkan."
-					},
-					"event": [
-						{
-							"listen": "test",
-							"script": {
-								"type": "text/javascript",
-								"exec": [
-									"const json = pm.response.json();",
-									"",
-									"pm.test('Status code is 200', () => {",
-									"  pm.response.to.have.status(200);",
-									"});",
-									"",
-									"pm.test('Got new access_token', () => {",
-									"  pm.expect(json.data).to.have.property('access_token');",
-									"});",
-									"",
-									"pm.test('Got new refresh_token', () => {",
-									"  pm.expect(json.data).to.have.property('refresh_token');",
-									"});",
-									"",
-									"if (json.data && json.data.access_token) {",
-									"  pm.environment.set('accessToken', json.data.access_token);",
-									"  pm.environment.set('refreshToken', json.data.refresh_token);",
-									"  console.log('✅ Tokens rotated and saved to environment');",
-									"}"
-								]
-							}
-						}
-					],
-					"response": [
-						{
-							"name": "200 OK — Token Rotated",
-							"status": "OK",
-							"code": 200,
-							"body": "{\n  \"status\": \"success\",\n  \"code\": 200,\n  \"data\": {\n    \"access_token\": \"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...(baru)\",\n    \"token_type\": \"Bearer\",\n    \"expires_in\": 3600,\n    \"refresh_token\": \"uuid-baru...\",\n    \"scope\": \"read write\"\n  },\n  \"message\": \"Token refreshed successfully\",\n  \"service\": \"oauth-server\",\n  \"timestamp\": \"2026-06-13T00:00:00.000Z\"\n}"
-						},
-						{
-							"name": "401 Invalid Refresh Token",
-							"status": "Unauthorized",
-							"code": 401,
-							"body": "{\n  \"status\": \"error\",\n  \"code\": 401,\n  \"message\": \"Invalid or expired refresh token\",\n  \"service\": \"oauth-server\",\n  \"timestamp\": \"2026-06-13T00:00:00.000Z\"\n}"
-						}
-					]
-				},
-				{
-					"name": "Introspect Token (valid)",
-					"request": {
-						"method": "POST",
-						"header": [
-							{
-								"key": "Content-Type",
-								"value": "application/json"
-							},
-							{
-								"key": "Authorization",
-								"value": "Basic c21hcnRjaXR5LWFwcDpzbWFydGNpdHktc2VjcmV0",
-								"description": "base64('smartcity-app:smartcity-secret')"
-							}
-						],
-						"body": {
-							"mode": "raw",
-							"raw": "{\n  \"token\": \"{{accessToken}}\"\n}",
-							"options": {
-								"raw": {
-									"language": "json"
-								}
-							}
-						},
-						"url": {
-							"raw": "{{oauthUrl}}/oauth/introspect",
-							"host": ["{{oauthUrl}}"],
-							"path": ["oauth", "introspect"]
-						},
-						"description": "Dipakai Gateway secara internal untuk memvalidasi token.\nHeader Authorization menggunakan Basic Auth: base64(clientId:clientSecret).\n\nJalankan 'Password Grant' dulu agar {{accessToken}} terisi."
-					},
-					"event": [
-						{
-							"listen": "test",
-							"script": {
-								"type": "text/javascript",
-								"exec": [
-									"const json = pm.response.json();",
-									"",
-									"pm.test('Status code is 200', () => {",
-									"  pm.response.to.have.status(200);",
-									"});",
-									"",
-									"pm.test('Token is active', () => {",
-									"  pm.expect(json.active).to.be.true;",
-									"});",
-									"",
-									"pm.test('Has username', () => {",
-									"  pm.expect(json).to.have.property('username');",
-									"});",
-									"",
-									"pm.test('Has role', () => {",
-									"  pm.expect(json).to.have.property('role');",
-									"});",
-									"",
-									"pm.test('Has exp (expiry)', () => {",
-									"  pm.expect(json).to.have.property('exp');",
-									"});",
-									"",
-									"pm.test('Has client_id', () => {",
-									"  pm.expect(json).to.have.property('client_id');",
-									"});"
-								]
-							}
-						}
-					],
-					"response": [
-						{
-							"name": "200 OK — Token Active",
-							"status": "OK",
-							"code": 200,
-							"body": "{\n  \"active\": true,\n  \"sub\": \"1\",\n  \"username\": \"admin\",\n  \"role\": \"admin\",\n  \"client_id\": \"smartcity-app\",\n  \"scope\": \"read write\",\n  \"exp\": 1234567890\n}"
-						},
-						{
-							"name": "200 — Token Inactive",
-							"status": "OK",
-							"code": 200,
-							"body": "{\n  \"active\": false\n}"
-						}
-					]
-				},
-				{
-					"name": "Introspect Token (invalid/expired)",
-					"request": {
-						"method": "POST",
-						"header": [
-							{
-								"key": "Content-Type",
-								"value": "application/json"
-							},
-							{
-								"key": "Authorization",
-								"value": "Basic c21hcnRjaXR5LWFwcDpzbWFydGNpdHktc2VjcmV0"
-							}
-						],
-						"body": {
-							"mode": "raw",
-							"raw": "{\n  \"token\": \"tokeninvalidpalsu123\"\n}",
-							"options": {
-								"raw": {
-									"language": "json"
-								}
-							}
-						},
-						"url": {
-							"raw": "{{oauthUrl}}/oauth/introspect",
-							"host": ["{{oauthUrl}}"],
-							"path": ["oauth", "introspect"]
-						},
-						"description": "Test dengan token palsu — harus return { active: false }"
-					},
-					"event": [
-						{
-							"listen": "test",
-							"script": {
-								"type": "text/javascript",
-								"exec": [
-									"const json = pm.response.json();",
-									"",
-									"pm.test('Status code is 200', () => {",
-									"  pm.response.to.have.status(200);",
-									"});",
-									"",
-									"pm.test('Token is NOT active', () => {",
-									"  pm.expect(json.active).to.be.false;",
-									"});"
-								]
-							}
-						}
-					],
-					"response": []
-				},
-				{
-					"name": "Revoke Token",
-					"request": {
-						"method": "POST",
-						"header": [
-							{
-								"key": "Content-Type",
-								"value": "application/json"
-							}
-						],
-						"body": {
-							"mode": "raw",
-							"raw": "{\n  \"token\": \"{{accessToken}}\"\n}",
-							"options": {
-								"raw": {
-									"language": "json"
-								}
-							}
-						},
-						"url": {
-							"raw": "{{oauthUrl}}/oauth/revoke",
-							"host": ["{{oauthUrl}}"],
-							"path": ["oauth", "revoke"]
-						},
-						"description": "Cabut token. Setelah revoke, token tidak bisa dipakai lagi.\nJalankan 'Introspect Token (valid)' setelah ini untuk membuktikan token sudah tidak aktif."
-					},
-					"event": [
-						{
-							"listen": "test",
-							"script": {
-								"type": "text/javascript",
-								"exec": [
-									"const json = pm.response.json();",
-									"",
-									"pm.test('Status code is 200', () => {",
-									"  pm.response.to.have.status(200);",
-									"});",
-									"",
-									"pm.test('Revoke successful', () => {",
-									"  pm.expect(json.status).to.equal('success');",
-									"});",
-									"",
-									"pm.environment.unset('accessToken');",
-									"console.log('🗑️ accessToken cleared from environment');"
-								]
-							}
-						}
-					],
-					"response": [
-						{
-							"name": "200 OK",
-							"status": "OK",
-							"code": 200,
-							"body": "{\n  \"status\": \"success\",\n  \"code\": 200,\n  \"message\": \"Token revoked successfully\",\n  \"service\": \"oauth-server\",\n  \"timestamp\": \"2026-06-13T00:00:00.000Z\"\n}"
-						}
-					]
-				},
-				{
-					"name": "[ERROR] Wrong Client Secret",
-					"request": {
-						"method": "POST",
-						"header": [
-							{
-								"key": "Content-Type",
-								"value": "application/json"
-							}
-						],
-						"body": {
-							"mode": "raw",
-							"raw": "{\n  \"grant_type\": \"password\",\n  \"client_id\": \"smartcity-app\",\n  \"client_secret\": \"salahbangetsecretnya\",\n  \"username\": \"admin\",\n  \"password\": \"admin123\"\n}",
-							"options": {
-								"raw": {
-									"language": "json"
-								}
-							}
-						},
-						"url": {
-							"raw": "{{oauthUrl}}/oauth/token",
-							"host": ["{{oauthUrl}}"],
-							"path": ["oauth", "token"]
-						},
-						"description": "Test negatif: client_secret salah → harus 401"
-					},
-					"event": [
-						{
-							"listen": "test",
-							"script": {
-								"type": "text/javascript",
-								"exec": [
-									"const json = pm.response.json();",
-									"",
-									"pm.test('Status code is 401', () => {",
-									"  pm.response.to.have.status(401);",
-									"});",
-									"",
-									"pm.test('Error status', () => {",
-									"  pm.expect(json.status).to.equal('error');",
-									"});",
-									"",
-									"pm.test('Invalid client message', () => {",
-									"  pm.expect(json.message).to.include('Invalid client');",
-									"});"
-								]
-							}
-						}
-					],
-					"response": []
-				},
-				{
-					"name": "[ERROR] Unsupported Grant Type",
-					"request": {
-						"method": "POST",
-						"header": [
-							{
-								"key": "Content-Type",
-								"value": "application/json"
-							}
-						],
-						"body": {
-							"mode": "raw",
-							"raw": "{\n  \"grant_type\": \"authorization_code\",\n  \"client_id\": \"{{clientId}}\",\n  \"client_secret\": \"{{clientSecret}}\"\n}",
-							"options": {
-								"raw": {
-									"language": "json"
-								}
-							}
-						},
-						"url": {
-							"raw": "{{oauthUrl}}/oauth/token",
-							"host": ["{{oauthUrl}}"],
-							"path": ["oauth", "token"]
-						},
-						"description": "Test negatif: grant_type tidak didukung → harus 400"
-					},
-					"event": [
-						{
-							"listen": "test",
-							"script": {
-								"type": "text/javascript",
-								"exec": [
-									"const json = pm.response.json();",
-									"",
-									"pm.test('Status code is 400', () => {",
-									"  pm.response.to.have.status(400);",
-									"});",
-									"",
-									"pm.test('Error mentions grant type', () => {",
-									"  pm.expect(json.message.toLowerCase()).to.include('grant');",
-									"});"
-								]
-							}
-						}
-					],
-					"response": []
+					"event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+						"pm.test('Status 200', () => pm.response.to.have.status(200));",
+						"pm.test('Models loaded', () => pm.expect(pm.response.json().models_loaded).to.equal(3));"
+					]}}]
 				}
 			]
 		},
 		{
-			"name": "API Gateway (port 3000)",
-			"description": "Semua request melalui API Gateway di port 3000",
+			"name": "1. OAuth",
 			"item": [
 				{
-					"name": "Health Check",
+					"name": "Login Admin (Password Grant)",
 					"request": {
-						"method": "GET",
-						"header": [],
-						"url": {
-							"raw": "{{baseUrl}}/health",
-							"host": ["{{baseUrl}}"],
-							"path": ["health"]
-						},
-						"description": "Cek apakah Gateway berjalan. Tidak memerlukan token."
+						"method": "POST",
+						"header": [{ "key": "Content-Type", "value": "application/json" }],
+						"body": { "mode": "raw", "raw": "{\n  \"grant_type\": \"password\",\n  \"client_id\": \"{{clientId}}\",\n  \"client_secret\": \"{{clientSecret}}\",\n  \"username\": \"admin\",\n  \"password\": \"admin123\"\n}" },
+						"url": { "raw": "{{baseUrl}}/oauth/token", "host": ["{{baseUrl}}"], "path": ["oauth", "token"] }
 					},
-					"event": [
-						{
-							"listen": "test",
-							"script": {
-								"type": "text/javascript",
-								"exec": [
-									"const json = pm.response.json();",
-									"",
-									"pm.test('Status code is 200', () => {",
-									"  pm.response.to.have.status(200);",
-									"});",
-									"",
-									"pm.test('Status is success', () => {",
-									"  pm.expect(json.status).to.equal('success');",
-									"});",
-									"",
-									"pm.test('Service is api-gateway', () => {",
-									"  pm.expect(json.service).to.equal('api-gateway');",
-									"});",
-									"",
-									"pm.test('Has timestamp', () => {",
-									"  pm.expect(json).to.have.property('timestamp');",
-									"});"
-								]
-							}
-						}
-					],
-					"response": [
-						{
-							"name": "200 OK",
-							"status": "OK",
-							"code": 200,
-							"body": "{\n  \"status\": \"success\",\n  \"code\": 200,\n  \"message\": \"API Gateway is running\",\n  \"data\": { \"gateway\": \"ok\" },\n  \"service\": \"api-gateway\",\n  \"timestamp\": \"2026-06-13T00:00:00.000Z\"\n}"
-						}
-					]
+					"event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+						"const json = pm.response.json();",
+						"pm.test('Status 200', () => pm.response.to.have.status(200));",
+						"pm.test('Has access_token', () => pm.expect(json.data).to.have.property('access_token'));",
+						"if (json.data) {",
+						"  pm.environment.set('accessToken', json.data.access_token);",
+						"  pm.environment.set('refreshToken', json.data.refresh_token);",
+						"}"
+					]}}]
 				},
 				{
-					"name": "OAuth Token via Gateway (forward test)",
+					"name": "IoT Token (Client Credentials)",
+					"request": {
+						"method": "POST",
+						"header": [{ "key": "Content-Type", "value": "application/json" }],
+						"body": { "mode": "raw", "raw": "{\n  \"grant_type\": \"client_credentials\",\n  \"client_id\": \"iot-device\",\n  \"client_secret\": \"iot-secret\"\n}" },
+						"url": { "raw": "{{baseUrl}}/oauth/token", "host": ["{{baseUrl}}"], "path": ["oauth", "token"] }
+					},
+					"event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+						"const json = pm.response.json();",
+						"pm.test('Status 200', () => pm.response.to.have.status(200));",
+						"pm.test('Scope is service', () => pm.expect(json.data.scope).to.equal('service'));",
+						"if (json.data) pm.environment.set('iotToken', json.data.access_token);"
+					]}}]
+				},
+				{
+					"name": "Refresh Token",
+					"request": {
+						"method": "POST",
+						"header": [{ "key": "Content-Type", "value": "application/json" }],
+						"body": { "mode": "raw", "raw": "{\n  \"grant_type\": \"refresh_token\",\n  \"client_id\": \"{{clientId}}\",\n  \"client_secret\": \"{{clientSecret}}\",\n  \"refresh_token\": \"{{refreshToken}}\"\n}" },
+						"url": { "raw": "{{baseUrl}}/oauth/token", "host": ["{{baseUrl}}"], "path": ["oauth", "token"] }
+					},
+					"event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+						"const json = pm.response.json();",
+						"pm.test('Status 200', () => pm.response.to.have.status(200));",
+						"if (json.data) {",
+						"  pm.environment.set('accessToken', json.data.access_token);",
+						"  pm.environment.set('refreshToken', json.data.refresh_token);",
+						"}"
+					]}}]
+				}
+			]
+		},
+		{
+			"name": "2. Smart Bin",
+			"item": [
+				{
+					"name": "List All Bins",
+					"request": {
+						"method": "GET",
+						"header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
+						"url": { "raw": "{{baseUrl}}/api/bins", "host": ["{{baseUrl}}"], "path": ["api", "bins"] }
+					},
+					"event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+						"pm.test('Status 200', () => pm.response.to.have.status(200));",
+						"pm.test('Has bins array', () => pm.expect(pm.response.json().data).to.be.an('array'));",
+						"pm.test('Has 10 bins', () => pm.expect(pm.response.json().data.length).to.equal(10));"
+					]}}]
+				},
+				{
+					"name": "Detail Bin (id=1)",
+					"request": {
+						"method": "GET",
+						"header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
+						"url": { "raw": "{{baseUrl}}/api/bins/1", "host": ["{{baseUrl}}"], "path": ["api", "bins", "1"] }
+					},
+					"event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+						"pm.test('Status 200', () => pm.response.to.have.status(200));",
+						"pm.test('Bin code correct', () => pm.expect(pm.response.json().data.bin_code).to.equal('BIN-Z1-01'));"
+					]}}]
+				},
+				{
+					"name": "Set Bin Maintenance (id=4)",
+					"request": {
+						"method": "PUT",
+						"header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
+						"url": { "raw": "{{baseUrl}}/api/bins/4/maintenance", "host": ["{{baseUrl}}"], "path": ["api", "bins", "4", "maintenance"] }
+					},
+					"event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+						"pm.test('Status 200', () => pm.response.to.have.status(200));",
+						"pm.test('Status is Maintenance', () => pm.expect(pm.response.json().data.status).to.equal('Maintenance'));"
+					]}}]
+				}
+			]
+		},
+		{
+			"name": "3. IoT Telemetry",
+			"item": [
+				{
+					"name": "Telemetry Normal (BIN-Z1-01)",
 					"request": {
 						"method": "POST",
 						"header": [
-							{
-								"key": "Content-Type",
-								"value": "application/json"
-							}
+							{ "key": "Authorization", "value": "Bearer {{iotToken}}" },
+							{ "key": "Content-Type", "value": "application/json" }
 						],
-						"body": {
-							"mode": "raw",
-							"raw": "{\n  \"grant_type\": \"password\",\n  \"client_id\": \"{{clientId}}\",\n  \"client_secret\": \"{{clientSecret}}\",\n  \"username\": \"admin\",\n  \"password\": \"admin123\"\n}",
-							"options": {
-								"raw": {
-									"language": "json"
-								}
-							}
-						},
-						"url": {
-							"raw": "{{baseUrl}}/oauth/token",
-							"host": ["{{baseUrl}}"],
-							"path": ["oauth", "token"]
-						},
-						"description": "Membuktikan Gateway berhasil mem-forward /oauth/* ke OAuth Server.\nRequest ke port 3000 tapi diproses oleh OAuth Server di port 3002."
+						"body": { "mode": "raw", "raw": "{\n  \"bin_id\": \"BIN-Z1-01\",\n  \"fill_level\": 45.5,\n  \"gas_level\": 150,\n  \"temperature\": 30.0,\n  \"calibrated_height\": 98.0,\n  \"latitude\": -6.1944,\n  \"longitude\": 106.8318\n}" },
+						"url": { "raw": "{{baseUrl}}/iot/telemetry", "host": ["{{baseUrl}}"], "path": ["iot", "telemetry"] }
 					},
-					"event": [
-						{
-							"listen": "test",
-							"script": {
-								"type": "text/javascript",
-								"exec": [
-									"const json = pm.response.json();",
-									"",
-									"pm.test('Status code is 200', () => {",
-									"  pm.response.to.have.status(200);",
-									"});",
-									"",
-									"pm.test('OAuth forward berhasil — dapat access_token', () => {",
-									"  pm.expect(json.data).to.have.property('access_token');",
-									"});",
-									"",
-									"pm.test('Response berasal dari oauth-server (bukan gateway)', () => {",
-									"  pm.expect(json.service).to.equal('oauth-server');",
-									"});",
-									"",
-									"if (json.data && json.data.access_token) {",
-									"  pm.environment.set('accessToken', json.data.access_token);",
-									"  pm.environment.set('refreshToken', json.data.refresh_token);",
-									"  console.log('✅ Tokens saved via Gateway forward');",
-									"}"
-								]
-							}
-						}
-					],
-					"response": []
+					"event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+						"const json = pm.response.json();",
+						"pm.test('Status 201', () => pm.response.to.have.status(201));",
+						"pm.test('Volume updated', () => pm.expect(json.data.current_volume_percentage).to.equal(45.5));",
+						"pm.test('Tinggi updated', () => pm.expect(json.data.tinggi).to.equal(98));",
+						"pm.test('ML predictions exist', () => pm.expect(json.data).to.have.property('ml_predictions'));",
+						"pm.test('No dispatch (not critical)', () => pm.expect(json.data.ml_predictions.dispatch).to.be.null);"
+					]}}]
 				},
 				{
-					"name": "[401] Protected Route — Tanpa Token",
-					"request": {
-						"method": "GET",
-						"header": [],
-						"url": {
-							"raw": "{{baseUrl}}/api/citizens",
-							"host": ["{{baseUrl}}"],
-							"path": ["api", "citizens"]
-						},
-						"description": "Akses endpoint protected tanpa Authorization header → harus 401"
-					},
-					"event": [
-						{
-							"listen": "test",
-							"script": {
-								"type": "text/javascript",
-								"exec": [
-									"const json = pm.response.json();",
-									"",
-									"pm.test('Status code is 401', () => {",
-									"  pm.response.to.have.status(401);",
-									"});",
-									"",
-									"pm.test('Status is error', () => {",
-									"  pm.expect(json.status).to.equal('error');",
-									"});",
-									"",
-									"pm.test('Message mentions Authorization', () => {",
-									"  pm.expect(json.message).to.include('Authorization');",
-									"});",
-									"",
-									"pm.test('Service is api-gateway', () => {",
-									"  pm.expect(json.service).to.equal('api-gateway');",
-									"});"
-								]
-							}
-						}
-					],
-					"response": [
-						{
-							"name": "401 Unauthorized",
-							"status": "Unauthorized",
-							"code": 401,
-							"body": "{\n  \"status\": \"error\",\n  \"code\": 401,\n  \"message\": \"Authorization header missing or malformed. Use: Bearer <token>\",\n  \"data\": null,\n  \"service\": \"api-gateway\",\n  \"timestamp\": \"2026-06-13T00:00:00.000Z\"\n}"
-						}
-					]
-				},
-				{
-					"name": "[401] Protected Route — Token Invalid",
-					"request": {
-						"method": "GET",
-						"header": [
-							{
-								"key": "Authorization",
-								"value": "Bearer tokenpalsuyangtidakvalidsama sekali123"
-							}
-						],
-						"url": {
-							"raw": "{{baseUrl}}/api/citizens",
-							"host": ["{{baseUrl}}"],
-							"path": ["api", "citizens"]
-						},
-						"description": "Token ada tapi tidak valid (bukan JWT yang benar) → harus 401"
-					},
-					"event": [
-						{
-							"listen": "test",
-							"script": {
-								"type": "text/javascript",
-								"exec": [
-									"const json = pm.response.json();",
-									"",
-									"pm.test('Status code is 401', () => {",
-									"  pm.response.to.have.status(401);",
-									"});",
-									"",
-									"pm.test('Invalid token error message', () => {",
-									"  pm.expect(json.message).to.include('Invalid token');",
-									"});",
-									"",
-									"pm.test('Service is api-gateway', () => {",
-									"  pm.expect(json.service).to.equal('api-gateway');",
-									"});"
-								]
-							}
-						}
-					],
-					"response": [
-						{
-							"name": "401 Invalid Token",
-							"status": "Unauthorized",
-							"code": 401,
-							"body": "{\n  \"status\": \"error\",\n  \"code\": 401,\n  \"message\": \"Invalid token signature.\",\n  \"data\": null,\n  \"service\": \"api-gateway\",\n  \"timestamp\": \"2026-06-13T00:00:00.000Z\"\n}"
-						}
-					]
-				},
-				{
-					"name": "[502] Citizen Service — Token Valid, Upstream Down",
-					"request": {
-						"method": "GET",
-						"header": [
-							{
-								"key": "Authorization",
-								"value": "Bearer {{accessToken}}"
-							}
-						],
-						"url": {
-							"raw": "{{baseUrl}}/api/citizens",
-							"host": ["{{baseUrl}}"],
-							"path": ["api", "citizens"]
-						},
-						"description": "Token valid tapi upstream Citizen Service belum jalan → harus 502.\n502 adalah PERILAKU YANG BENAR di Sprint 1.\n\nJalankan 'Password Grant' dulu agar {{accessToken}} terisi."
-					},
-					"event": [
-						{
-							"listen": "test",
-							"script": {
-								"type": "text/javascript",
-								"exec": [
-									"const json = pm.response.json();",
-									"",
-									"pm.test('Status code is 502 (upstream belum jalan — expected di Sprint 1)', () => {",
-									"  pm.response.to.have.status(502);",
-									"});",
-									"",
-									"pm.test('Error message mentions unavailable', () => {",
-									"  pm.expect(json.message).to.include('unavailable');",
-									"});",
-									"",
-									"pm.test('Service is api-gateway', () => {",
-									"  pm.expect(json.service).to.equal('api-gateway');",
-									"});"
-								]
-							}
-						}
-					],
-					"response": [
-						{
-							"name": "502 Bad Gateway",
-							"status": "Bad Gateway",
-							"code": 502,
-							"body": "{\n  \"status\": \"error\",\n  \"code\": 502,\n  \"message\": \"Upstream service unavailable: http://localhost:8000\",\n  \"data\": null,\n  \"service\": \"api-gateway\",\n  \"timestamp\": \"2026-06-13T00:00:00.000Z\"\n}"
-						}
-					]
-				},
-				{
-					"name": "[502] Traffic Service — Token Valid, Upstream Down",
-					"request": {
-						"method": "GET",
-						"header": [
-							{
-								"key": "Authorization",
-								"value": "Bearer {{accessToken}}"
-							}
-						],
-						"url": {
-							"raw": "{{baseUrl}}/api/traffic/current",
-							"host": ["{{baseUrl}}"],
-							"path": ["api", "traffic", "current"]
-						},
-						"description": "Token valid tapi upstream Traffic Service belum jalan → harus 502"
-					},
-					"event": [
-						{
-							"listen": "test",
-							"script": {
-								"type": "text/javascript",
-								"exec": [
-									"const json = pm.response.json();",
-									"",
-									"pm.test('Status code is 502 (expected di Sprint 1)', () => {",
-									"  pm.response.to.have.status(502);",
-									"});"
-								]
-							}
-						}
-					],
-					"response": []
-				},
-				{
-					"name": "[502] Python ML Service — Token Valid, Upstream Down",
+					"name": "Telemetry Critical — Trigger Auto-Dispatch (BIN-Z3-01)",
 					"request": {
 						"method": "POST",
 						"header": [
-							{
-								"key": "Authorization",
-								"value": "Bearer {{accessToken}}"
-							},
-							{
-								"key": "Content-Type",
-								"value": "application/json"
-							}
+							{ "key": "Authorization", "value": "Bearer {{iotToken}}" },
+							{ "key": "Content-Type", "value": "application/json" }
 						],
-						"body": {
-							"mode": "raw",
-							"raw": "{\n  \"hour\": 8,\n  \"day_of_week\": 1,\n  \"weather_code\": 0,\n  \"prev_density\": 45.0,\n  \"location\": \"zone1\"\n}",
-							"options": {
-								"raw": {
-									"language": "json"
-								}
-							}
-						},
-						"url": {
-							"raw": "{{baseUrl}}/predict/traffic",
-							"host": ["{{baseUrl}}"],
-							"path": ["predict", "traffic"]
-						},
-						"description": "Token valid tapi upstream Python ML belum jalan → harus 502"
+						"body": { "mode": "raw", "raw": "{\n  \"bin_id\": \"BIN-Z3-01\",\n  \"fill_level\": 95.0,\n  \"gas_level\": 600,\n  \"temperature\": 35.0,\n  \"calibrated_height\": 120.0,\n  \"latitude\": -6.2383,\n  \"longitude\": 106.8000\n}" },
+						"url": { "raw": "{{baseUrl}}/iot/telemetry", "host": ["{{baseUrl}}"], "path": ["iot", "telemetry"] }
 					},
-					"event": [
-						{
-							"listen": "test",
-							"script": {
-								"type": "text/javascript",
-								"exec": [
-									"const json = pm.response.json();",
-									"",
-									"pm.test('Status code is 502 (expected di Sprint 1)', () => {",
-									"  pm.response.to.have.status(502);",
-									"});"
-								]
-							}
-						}
-					],
-					"response": []
+					"event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+						"const json = pm.response.json();",
+						"pm.test('Status 201', () => pm.response.to.have.status(201));",
+						"pm.test('Priority is Urgent or Critical', () => {",
+						"  const p = json.data.ml_predictions.priority;",
+						"  pm.expect(['Urgent','Critical']).to.include(p);",
+						"});",
+						"pm.test('Dispatch triggered', () => {",
+						"  const d = json.data.ml_predictions.dispatch;",
+						"  pm.expect(d).to.not.be.null;",
+						"  if (d && d.schedule_id) pm.environment.set('lastScheduleId', d.schedule_id);",
+						"});"
+					]}}]
 				},
 				{
-					"name": "[404] Route Tidak Ada",
+					"name": "[401] Telemetry Tanpa Token",
+					"request": {
+						"method": "POST",
+						"header": [{ "key": "Content-Type", "value": "application/json" }],
+						"body": { "mode": "raw", "raw": "{\n  \"bin_id\": \"BIN-Z1-01\",\n  \"fill_level\": 50.0\n}" },
+						"url": { "raw": "{{baseUrl}}/iot/telemetry", "host": ["{{baseUrl}}"], "path": ["iot", "telemetry"] }
+					},
+					"event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+						"pm.test('Status 401', () => pm.response.to.have.status(401));"
+					]}}]
+				}
+			]
+		},
+		{
+			"name": "4. ML Predictions",
+			"item": [
+				{
+					"name": "Predict Fill Rate",
+					"request": {
+						"method": "POST",
+						"header": [
+							{ "key": "Authorization", "value": "Bearer {{accessToken}}" },
+							{ "key": "Content-Type", "value": "application/json" }
+						],
+						"body": { "mode": "raw", "raw": "{\n  \"jam\": 14,\n  \"suhu_cuaca\": 32.0,\n  \"volume_sekarang\": 45.0,\n  \"latitude\": -6.1944,\n  \"longitude\": 106.8318,\n  \"is_weekend\": 0\n}" },
+						"url": { "raw": "{{baseUrl}}/predict/fill-rate", "host": ["{{baseUrl}}"], "path": ["predict", "fill-rate"] }
+					},
+					"event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+						"pm.test('Status 200', () => pm.response.to.have.status(200));",
+						"pm.test('Has hours_until_full', () => pm.expect(pm.response.json()).to.have.property('hours_until_full'));"
+					]}}]
+				},
+				{
+					"name": "Predict Priority",
+					"request": {
+						"method": "POST",
+						"header": [
+							{ "key": "Authorization", "value": "Bearer {{accessToken}}" },
+							{ "key": "Content-Type", "value": "application/json" }
+						],
+						"body": { "mode": "raw", "raw": "{\n  \"volume_sekarang\": 85.0,\n  \"kadar_metana\": 30.0,\n  \"laporan_warga\": 3\n}" },
+						"url": { "raw": "{{baseUrl}}/predict/priority", "host": ["{{baseUrl}}"], "path": ["predict", "priority"] }
+					},
+					"event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+						"pm.test('Status 200', () => pm.response.to.have.status(200));",
+						"pm.test('Has pickup_priority', () => {",
+						"  const p = pm.response.json().pickup_priority;",
+						"  pm.expect(['Low','Medium','Urgent','Critical']).to.include(p);",
+						"});"
+					]}}]
+				},
+				{
+					"name": "Detect Anomaly",
+					"request": {
+						"method": "POST",
+						"header": [
+							{ "key": "Authorization", "value": "Bearer {{accessToken}}" },
+							{ "key": "Content-Type", "value": "application/json" }
+						],
+						"body": { "mode": "raw", "raw": "{\n  \"jarak_ultrasonik\": 25.0,\n  \"delta_volume_sec\": -5.5,\n  \"suhu_cuaca\": 38.2\n}" },
+						"url": { "raw": "{{baseUrl}}/detect/anomaly", "host": ["{{baseUrl}}"], "path": ["detect", "anomaly"] }
+					},
+					"event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+						"pm.test('Status 200', () => pm.response.to.have.status(200));",
+						"pm.test('Anomaly detected', () => pm.expect(pm.response.json().is_anomaly).to.be.true);"
+					]}}]
+				}
+			]
+		},
+		{
+			"name": "5. Fleet",
+			"item": [
+				{
+					"name": "List All Trucks",
 					"request": {
 						"method": "GET",
-						"header": [],
-						"url": {
-							"raw": "{{baseUrl}}/api/tidakada",
-							"host": ["{{baseUrl}}"],
-							"path": ["api", "tidakada"]
-						},
-						"description": "Akses route yang tidak terdaftar di Gateway → harus 404"
+						"header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
+						"url": { "raw": "{{baseUrl}}/api/fleet/trucks", "host": ["{{baseUrl}}"], "path": ["api", "fleet", "trucks"] }
 					},
-					"event": [
-						{
-							"listen": "test",
-							"script": {
-								"type": "text/javascript",
-								"exec": [
-									"const json = pm.response.json();",
-									"",
-									"pm.test('Status code is 404', () => {",
-									"  pm.response.to.have.status(404);",
-									"});",
-									"",
-									"pm.test('Status is error', () => {",
-									"  pm.expect(json.status).to.equal('error');",
-									"});"
-								]
-							}
-						}
-					],
-					"response": [
-						{
-							"name": "404 Not Found",
-							"status": "Not Found",
-							"code": 404,
-							"body": "{\n  \"status\": \"error\",\n  \"code\": 404,\n  \"message\": \"Route GET /api/tidakada not found\",\n  \"data\": null,\n  \"service\": \"api-gateway\",\n  \"timestamp\": \"2026-06-13T00:00:00.000Z\"\n}"
-						}
-					]
+					"event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+						"pm.test('Status 200', () => pm.response.to.have.status(200));",
+						"pm.test('Has trucks', () => pm.expect(pm.response.json().data).to.be.an('array'));"
+					]}}]
+				},
+				{
+					"name": "Register New Truck",
+					"request": {
+						"method": "POST",
+						"header": [
+							{ "key": "Authorization", "value": "Bearer {{accessToken}}" },
+							{ "key": "Content-Type", "value": "application/json" }
+						],
+						"body": { "mode": "raw", "raw": "{\n  \"license_plate\": \"B 9999 TST\",\n  \"driver_name\": \"Test Driver\",\n  \"max_capacity_ton\": 2.0\n}" },
+						"url": { "raw": "{{baseUrl}}/api/fleet/trucks", "host": ["{{baseUrl}}"], "path": ["api", "fleet", "trucks"] }
+					},
+					"event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+						"pm.test('Status 201', () => pm.response.to.have.status(201));",
+						"pm.test('Truck created', () => pm.expect(pm.response.json().data.license_plate).to.equal('B 9999 TST'));"
+					]}}]
+				},
+				{
+					"name": "Driver Check-In",
+					"request": {
+						"method": "POST",
+						"header": [
+							{ "key": "Authorization", "value": "Bearer {{accessToken}}" },
+							{ "key": "Content-Type", "value": "application/json" }
+						],
+						"body": { "mode": "raw", "raw": "{\n  \"license_plate\": \"B 9999 TST\"\n}" },
+						"url": { "raw": "{{baseUrl}}/api/fleet/driver-checkin", "host": ["{{baseUrl}}"], "path": ["api", "fleet", "driver-checkin"] }
+					},
+					"event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+						"pm.test('Status 200', () => pm.response.to.have.status(200));",
+						"pm.test('Status Available', () => pm.expect(pm.response.json().data.current_status).to.equal('Available'));"
+					]}}]
+				},
+				{
+					"name": "Complete Schedule",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{ "key": "Authorization", "value": "Bearer {{accessToken}}" },
+							{ "key": "Content-Type", "value": "application/json" }
+						],
+						"body": { "mode": "raw", "raw": "{\n  \"execution_status\": \"Completed\"\n}" },
+						"url": { "raw": "{{baseUrl}}/api/fleet/schedules/{{lastScheduleId}}/status", "host": ["{{baseUrl}}"], "path": ["api", "fleet", "schedules", "{{lastScheduleId}}", "status"] }
+					},
+					"event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+						"pm.test('Status 200', () => pm.response.to.have.status(200));"
+					]}}]
+				}
+			]
+		},
+		{
+			"name": "6. Citizen Report",
+			"item": [
+				{
+					"name": "Submit Report (form-data + photo)",
+					"request": {
+						"method": "POST",
+						"header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
+						"body": {
+							"mode": "formdata",
+							"formdata": [
+								{ "key": "reporter_name", "value": "Budi Santoso", "type": "text" },
+								{ "key": "reporter_phone", "value": "081234567001", "type": "text" },
+								{ "key": "issue_description", "value": "Tong sampah meluber di depan pasar", "type": "text" },
+								{ "key": "geo_coordinate", "value": "-6.1944,106.8318", "type": "text" },
+								{ "key": "photo", "type": "file", "src": "" }
+							]
+						},
+						"url": { "raw": "{{baseUrl}}/api/reports", "host": ["{{baseUrl}}"], "path": ["api", "reports"] },
+						"description": "Upload foto JPG/PNG (max 2MB). Klik 'Select Files' di field photo."
+					},
+					"event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+						"const json = pm.response.json();",
+						"pm.test('Status 201', () => pm.response.to.have.status(201));",
+						"pm.test('Status Pending', () => pm.expect(json.data.verification_status).to.equal('Pending'));",
+						"if (json.data) pm.environment.set('lastReportId', json.data.id);"
+					]}}]
+				},
+				{
+					"name": "Verify Report",
+					"request": {
+						"method": "POST",
+						"header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
+						"url": { "raw": "{{baseUrl}}/api/reports/{{lastReportId}}/verify", "host": ["{{baseUrl}}"], "path": ["api", "reports", "{{lastReportId}}", "verify"] }
+					},
+					"event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+						"pm.test('Status 200', () => pm.response.to.have.status(200));",
+						"pm.test('Status Reviewed', () => pm.expect(pm.response.json().data.verification_status).to.equal('Reviewed'));"
+					]}}]
+				},
+				{
+					"name": "Dispatch Truck to Report",
+					"request": {
+						"method": "POST",
+						"header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
+						"url": { "raw": "{{baseUrl}}/api/reports/{{lastReportId}}/dispatch", "host": ["{{baseUrl}}"], "path": ["api", "reports", "{{lastReportId}}", "dispatch"] }
+					},
+					"event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+						"pm.test('Status 200', () => pm.response.to.have.status(200));",
+						"pm.test('Status Dispatched', () => pm.expect(pm.response.json().data.report.verification_status).to.equal('Dispatched'));",
+						"pm.test('Truck assigned', () => pm.expect(pm.response.json().data.truck).to.have.property('license_plate'));"
+					]}}]
 				}
 			]
 		}

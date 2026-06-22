@@ -1,0 +1,8 @@
+const raw = msg.payload;
+
+if (!raw || !raw.bin_id || raw.fill_level === undefined) {
+    node.warn("Payload tidak lengkap, di-skip: " + JSON.stringify(raw));
+    return null;
+}
+
+return msg;

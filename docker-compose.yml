@@ -5,24 +5,109 @@ services:
     container_name: trashtrack-mysql
     environment:
       MYSQL_ROOT_PASSWORD: rootpass
-      MYSQL_DATABASE: trashtrack
+      MYSQL_DATABASE: smartcity
     ports:
       - "3306:3306"
     volumes:
       - mysql-data:/var/lib/mysql
-    
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-prootpass"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
   rabbitmq:
     image: rabbitmq:3.12-management
     container_name: trashtrack-rabbitmq
     ports:
       - "5672:5672"
       - "15672:15672"
-  
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
   mosquitto:
     image: eclipse-mosquitto:2.0
     container_name: trashtrack-mosquitto
     ports:
       - "1883:1883"
-  
+    volumes:
+      - ./iot/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+
+  oauth-server:
+    build: ./oauth-server
+    container_name: trashtrack-oauth
+    environment:
+      JWT_SECRET: supersecretkeyjwtpilihanyangpanjangdanaman
+      JWT_EXPIRES_IN: 1h
+      JWT_REFRESH_EXPIRES_IN: 7d
+      OAUTH_PORT: "3002"
+    ports:
+      - "3002:3002"
+    depends_on:
+      mysql:
+        condition: service_healthy
+
+  backend:
+    build: ./backend
+    container_name: trashtrack-backend
+    environment:
+      APP_NAME: TrashTrackBackend
+      APP_ENV: production
+      APP_DEBUG: "false"
+      APP_URL: http://backend:8000
+      DB_CONNECTION: mysql
+      DB_HOST: mysql
+      DB_PORT: "3306"
+      DB_DATABASE: smartcity
+      DB_USERNAME: root
+      DB_PASSWORD: rootpass
+      CACHE_STORE: file
+      SESSION_DRIVER: file
+      QUEUE_CONNECTION: sync
+      FILESYSTEM_DISK: public
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: "5672"
+      RABBITMQ_USER: guest
+      RABBITMQ_PASS: guest
+      ML_SERVICE_URL: http://python-ml:5000
+    ports:
+      - "8000:8000"
+    volumes:
+      - backend-storage:/app/storage/app/public
+    depends_on:
+      mysql:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+
+  python-ml:
+    build: ./python-ml-service
+    container_name: trashtrack-ml
+    ports:
+      - "5000:5000"
+
+  express-gateway:
+    build: ./express-gateway
+    container_name: trashtrack-gateway
+    environment:
+      JWT_SECRET: supersecretkeyjwtpilihanyangpanjangdanaman
+      JWT_EXPIRES_IN: 1h
+      GATEWAY_PORT: "3000"
+      OAUTH_SERVER_URL: http://oauth-server:3002
+      BACKEND_URL: http://backend:8000
+      PYTHON_ML_URL: http://python-ml:5000
+    ports:
+      - "3000:3000"
+    depends_on:
+      - oauth-server
+      - backend
+      - python-ml
+
 volumes:
   mysql-data:
+  backend-storage:

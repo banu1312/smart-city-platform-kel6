@@ -10,11 +10,14 @@ class StoreTelemetryRequest extends FormRequest {
 
     public function rules(): array {
         return [
-            'trash_bin_id' => 'required|integer|exists:trash_bins,id',
-            'distance_cm'  => 'required|numeric|min:0|max:400',
-            'methane_ppm'  => 'nullable|numeric|min:0',
-            'temperature_c'=> 'nullable|numeric',
-            'raw_payload'  => 'nullable|array',
+            'bin_id'             => 'required|string|exists:trash_bins,bin_code',
+            'fill_level'         => 'required|numeric|min:0|max:100',
+            'gas_level'          => 'nullable|numeric|min:0',
+            'temperature'        => 'nullable|numeric',
+            'calibrated_height'  => 'nullable|numeric|min:1',
+            'is_calibration'     => 'nullable|boolean',
+            'latitude'           => 'nullable|numeric',
+            'longitude'          => 'nullable|numeric',
         ];
     }
 

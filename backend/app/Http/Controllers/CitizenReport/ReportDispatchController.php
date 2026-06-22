@@ -94,10 +94,8 @@ class ReportDispatchController extends Controller {
             $report->verification_status = 'Dispatched';
             $report->save();
 
-            // cross-service: buat jadwal di tabel schedules
-            // trash_bin_id = 0 karena ini dari laporan warga bukan sensor
             $schedule = Schedule::create([
-                'trash_bin_id'   => 0,
+                'trash_bin_id'   => null,
                 'truck_id'       => $truck->id,
                 'scheduled_at'   => now(),
                 'priority_level' => 'Urgent',

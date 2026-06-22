@@ -21,9 +21,6 @@ python-ml-service/data/*.csv
 .DS_Store
 Thumbs.db
 
-# Claude
-.claude/
-
 # Data Volume Docker Lokal
 .docker_data/
 mysql-data/

@@ -35,4 +35,8 @@ return [
         ],
     ],
 
+    'ml' => [
+        'url' => env('ML_SERVICE_URL', 'http://python-ml:5000'),
+    ],
+
 ];

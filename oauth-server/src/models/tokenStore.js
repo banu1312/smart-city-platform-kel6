@@ -1,7 +1,7 @@
 const { v4: uuidv4 } = require("uuid");
 const jwt = require("jsonwebtoken");
+const bcrypt = require("bcryptjs");
 
-// In-memory store (sementara) - bisa diganti dengan MySQL di sprint berikutnya
 const accessTokens = new Map();
 const refreshTokens = new Map();
 const clients = new Map([
@@ -23,17 +23,28 @@ const clients = new Map([
 	],
 ]);
 
-// User dummy - nanti diambil dari tabel citizens di MySQL
 const users = new Map([
-	["admin", { id: 1, username: "admin", password: "admin123", role: "admin" }],
+	[
+		"admin",
+		{
+			id: 1,
+			username: "admin",
+			password: bcrypt.hashSync("admin123", 10),
+			role: "admin",
+		},
+	],
 	[
 		"warga1",
-		{ id: 2, username: "warga1", password: "warga123", role: "citizen" },
+		{
+			id: 2,
+			username: "warga1",
+			password: bcrypt.hashSync("warga123", 10),
+			role: "citizen",
+		},
 	],
 ]);
 
 const TokenStore = {
-	// Buat access token JWT
 	createAccessToken(user, client, scope) {
 		const payload = {
 			sub: user ? user.id : client.clientId,
@@ -60,10 +71,9 @@ const TokenStore = {
 		return { token, expiresAt };
 	},
 
-	// Buat refresh token (opaque, bukan JWT)
 	createRefreshToken(user, client) {
 		const token = uuidv4() + "-" + uuidv4();
-		const expiresAt = new Date(Date.now() + 7 * 24 * 3600 * 1000); // 7 hari
+		const expiresAt = new Date(Date.now() + 7 * 24 * 3600 * 1000);
 
 		refreshTokens.set(token, {
 			token,
@@ -111,7 +121,7 @@ const TokenStore = {
 	getUser(username, password) {
 		const user = users.get(username);
 		if (!user) return null;
-		if (user.password !== password) return null;
+		if (!bcrypt.compareSync(password, user.password)) return null;
 		return user;
 	},
 };

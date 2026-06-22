@@ -9,10 +9,14 @@ return new class extends Migration {
             $table->id();
             $table->string('bin_code', 50)->unique();
             $table->float('capacity_liters')->default(100.0);
+            $table->float('tinggi')->default(100.0);
             $table->float('current_volume_percentage')->default(0);
             $table->float('methane_gas_level')->default(0);
+            $table->float('temperature')->nullable();
+            $table->enum('tipe_lokasi', ['Perumahan', 'Pasar', 'Taman'])->default('Perumahan');
             $table->enum('status', ['Active', 'Maintenance', 'Vandalized'])->default('Active');
-            $table->string('location_coordinate', 100)->nullable();
+            $table->double('latitude')->nullable();
+            $table->double('longitude')->nullable();
             $table->timestamp('last_pickup')->nullable();
             $table->timestamps();
 
