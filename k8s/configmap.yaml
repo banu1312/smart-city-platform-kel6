@@ -1,0 +1,39 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: trashtrack-config
+  namespace: trashtrack
+data:
+  # === Database (non-secret) ===
+  DB_CONNECTION: "mysql"
+  DB_HOST: "mysql-service"
+  DB_PORT: "3306"
+  DB_DATABASE: "smartcity"
+ 
+  # === RabbitMQ ===
+  RABBITMQ_HOST: "rabbitmq-service"
+  RABBITMQ_PORT: "5672"
+ 
+  # === Service URLs (internal cluster DNS) ===
+  BACKEND_URL: "http://backend-service:8000"
+  OAUTH_SERVER_URL: "http://oauth-service:3002"
+  ML_SERVICE_URL: "http://ml-service:5000"
+  PYTHON_ML_URL: "http://ml-service:5000"
+ 
+  # === App Config ===
+  APP_ENV: "production"
+  APP_DEBUG: "false"
+  APP_NAME: "TrashTrackBackend"
+  APP_URL: "http://backend-service:8000"
+  LOG_LEVEL: "info"
+  CACHE_STORE: "file"
+  SESSION_DRIVER: "file"
+  QUEUE_CONNECTION: "sync"
+  FILESYSTEM_DISK: "public"
+  BCRYPT_ROUNDS: "12"
+ 
+  # === OAuth/Gateway Config ===
+  JWT_EXPIRES_IN: "1h"
+  JWT_REFRESH_EXPIRES_IN: "7d"
+  GATEWAY_PORT: "3000"
+  OAUTH_PORT: "3002"

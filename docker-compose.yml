@@ -36,7 +36,8 @@ services:
     ports:
       - "1883:1883"
     volumes:
-      - ./iot/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+      - ./IOT-Device/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+      - ./IOT Device/passwd:/mosquitto/config/passwd:ro
 
   oauth-server:
     build: ./oauth-server
