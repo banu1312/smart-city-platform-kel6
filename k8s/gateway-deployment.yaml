@@ -17,7 +17,8 @@ spec:
     spec:
       containers:
         - name: gateway
-          image: ghcr.io/banu1312/trashtrack-gateway:v1.0.0
+          image: smart-city-platform-kel6-express-gateway:latest
+          imagePullPolicy: IfNotPresent
           # Ganti image di atas dengan image gateway kalian yang sudah di-push
           ports:
             - containerPort: 3000

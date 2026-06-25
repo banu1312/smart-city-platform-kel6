@@ -41,26 +41,26 @@ spec:
             limits:
               memory: "256Mi"
               cpu: "300m"
-          readinessProbe:
-            exec:
-              command:
-                - rabbitmq-diagnostics
-                - -q
-                - ping
-            initialDelaySeconds: 20
-            periodSeconds: 10
-            timeoutSeconds: 5
-            failureThreshold: 10
-          livenessProbe:
-            exec:
-              command:
-                - rabbitmq-diagnostics
-                - -q
-                - ping
-            initialDelaySeconds: 30
-            periodSeconds: 15
-            timeoutSeconds: 5
-            failureThreshold: 5
+          # readinessProbe:
+          #   exec:
+          #     command:
+          #       - rabbitmq-diagnostics
+          #       - -q
+          #       - ping
+          #   initialDelaySeconds: 60
+          #   periodSeconds: 15
+          #   timeoutSeconds: 15
+          #   failureThreshold: 10
+          # livenessProbe:
+          #   exec:
+          #     command:
+          #       - rabbitmq-diagnostics
+          #       - -q
+          #       - ping
+          #   initialDelaySeconds: 90
+          #   periodSeconds: 20
+          #   timeoutSeconds: 15
+          #   failureThreshold: 5
  
 ---
 apiVersion: v1

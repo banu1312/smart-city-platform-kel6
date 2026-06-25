@@ -17,7 +17,8 @@ spec:
     spec:
       containers:
         - name: python-ml
-          image: ghcr.io/banu1312/trashtrack-ml:v1.0.0
+          image: smart-city-platform-kel6-python-ml:latest
+          imagePullPolicy: IfNotPresent
           # Ganti image di atas dengan image ML kalian yang sudah di-push
           ports:
             - containerPort: 5000

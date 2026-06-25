@@ -30,7 +30,8 @@ spec:
               done
               echo "MySQL is ready!"
         - name: run-migrations
-          image: ghcr.io/banu1312/trashtrack-backend:v1.0.0
+          image: smart-city-platform-kel6-backend:latest
+          imagePullPolicy: IfNotPresent 
           # Ganti image di atas dengan image backend kalian yang sudah di-push
           command:
             - sh
@@ -40,7 +41,10 @@ spec:
               echo "Migration done!"
           env:
             - name: APP_KEY
-              value: "base64:GENERATE_WITH_php_artisan_key_generate"
+              valueFrom:
+                secretKeyRef:
+                  name: trashtrack-secrets
+                  key: APP_KEY
             - name: DB_CONNECTION
               valueFrom:
                 configMapKeyRef:
@@ -74,7 +78,8 @@ spec:
  
       containers:
         - name: backend
-          image: ghcr.io/banu1312/trashtrack-backend:v1.0.0
+          image: smart-city-platform-kel6-backend:latest
+          imagePullPolicy: IfNotPresent 
           # Ganti image di atas dengan image backend kalian yang sudah di-push
           ports:
             - containerPort: 8000
@@ -101,7 +106,10 @@ spec:
                   name: trashtrack-config
                   key: APP_URL
             - name: APP_KEY
-              value: "base64:GENERATE_WITH_php_artisan_key_generate"
+              valueFrom:
+                secretKeyRef:
+                  name: trashtrack-secrets
+                  key: APP_KEY
             - name: DB_CONNECTION
               valueFrom:
                 configMapKeyRef:
@@ -184,7 +192,7 @@ spec:
               cpu: "500m"
           readinessProbe:
             httpGet:
-              path: /api/health
+              path: /api/smart-bin/health
               port: 8000
             initialDelaySeconds: 15
             periodSeconds: 10
@@ -192,7 +200,7 @@ spec:
             failureThreshold: 5
           livenessProbe:
             httpGet:
-              path: /api/health
+              path: /api/smart-bin/health
               port: 8000
             initialDelaySeconds: 30
             periodSeconds: 20
