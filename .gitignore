@@ -27,6 +27,9 @@ mysql-data/
 rabbitmq-data/
 grafana-data/
 
+# kubernetes
+k8s/secrets.yaml
+
 # IoT - kredensial & data lokal
 iot/passwd
 iot/data/
