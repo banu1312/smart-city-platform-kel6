@@ -26,6 +26,8 @@ Thumbs.db
 mysql-data/
 rabbitmq-data/
 grafana-data/
+prometheus-data/
+mosquitto-data/
 
 # kubernetes
 k8s/secrets.yaml
