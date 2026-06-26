@@ -1,0 +1,236 @@
+{
+  "__inputs": [],
+  "__requires": [
+    { "type": "grafana", "id": "grafana", "name": "Grafana", "version": "10.0.0" },
+    { "type": "datasource", "id": "prometheus", "name": "Prometheus", "version": "1.0.0" }
+  ],
+  "annotations": { "list": [] },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "id": null,
+  "links": [],
+  "panels": [
+    {
+      "id": 1,
+      "title": "Total Requests (Gateway)",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 6, "x": 0, "y": 0 },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 1000 },
+              { "color": "red", "value": 5000 }
+            ]
+          },
+          "unit": "short"
+        }
+      },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "orientation": "auto", "textMode": "auto", "colorMode": "background" },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus" },
+          "expr": "gateway_requests_total",
+          "legendFormat": "Total Requests"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "title": "Success Requests",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 6, "x": 6, "y": 0 },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [{ "color": "green", "value": null }]
+          },
+          "unit": "short"
+        }
+      },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "colorMode": "background" },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus" },
+          "expr": "gateway_requests_success",
+          "legendFormat": "Success"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "title": "4xx Errors",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 6, "x": 12, "y": 0 },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 10 },
+              { "color": "red", "value": 50 }
+            ]
+          },
+          "unit": "short"
+        }
+      },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "colorMode": "background" },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus" },
+          "expr": "gateway_requests_error_4xx",
+          "legendFormat": "4xx Errors"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "title": "5xx Errors",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 6, "x": 18, "y": 0 },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 1 }
+            ]
+          },
+          "unit": "short"
+        }
+      },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "colorMode": "background" },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus" },
+          "expr": "gateway_requests_error_5xx",
+          "legendFormat": "5xx Errors"
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "title": "Request Rate (per minute)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 4 },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "unit": "reqps"
+        }
+      },
+      "options": { "tooltip": { "mode": "multi" } },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus" },
+          "expr": "rate(gateway_requests_total[1m])",
+          "legendFormat": "Total"
+        },
+        {
+          "datasource": { "type": "prometheus" },
+          "expr": "rate(gateway_requests_success[1m])",
+          "legendFormat": "Success"
+        },
+        {
+          "datasource": { "type": "prometheus" },
+          "expr": "rate(gateway_requests_error_4xx[1m])",
+          "legendFormat": "4xx"
+        },
+        {
+          "datasource": { "type": "prometheus" },
+          "expr": "rate(gateway_requests_error_5xx[1m])",
+          "legendFormat": "5xx"
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "title": "Error Rate (%)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 4 },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "unit": "percent",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 5 },
+              { "color": "red", "value": 10 }
+            ]
+          }
+        }
+      },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus" },
+          "expr": "rate(gateway_requests_error_4xx[5m]) / rate(gateway_requests_total[5m]) * 100",
+          "legendFormat": "4xx Error Rate"
+        },
+        {
+          "datasource": { "type": "prometheus" },
+          "expr": "rate(gateway_requests_error_5xx[5m]) / rate(gateway_requests_total[5m]) * 100",
+          "legendFormat": "5xx Error Rate"
+        }
+      ]
+    },
+    {
+      "id": 7,
+      "title": "Rate Limited Requests",
+      "type": "timeseries",
+      "gridPos": { "h": 6, "w": 12, "x": 0, "y": 12 },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "fixed", "fixedColor": "orange" },
+          "unit": "short"
+        }
+      },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus" },
+          "expr": "rate(gateway_requests_rate_limited[1m])",
+          "legendFormat": "Rate Limited"
+        }
+      ]
+    },
+    {
+      "id": 8,
+      "title": "Service Health Status",
+      "type": "table",
+      "gridPos": { "h": 6, "w": 12, "x": 12, "y": 12 },
+      "fieldConfig": {
+        "defaults": { "unit": "short" }
+      },
+      "options": { "showHeader": true },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus" },
+          "expr": "up",
+          "legendFormat": "{{job}}",
+          "instant": true
+        }
+      ]
+    }
+  ],
+  "refresh": "10s",
+  "schemaVersion": 38,
+  "tags": ["trashtrack", "smart-city", "kelompok-6"],
+  "templating": { "list": [] },
+  "time": { "from": "now-1h", "to": "now" },
+  "timepicker": {},
+  "timezone": "Asia/Jakarta",
+  "title": "TrashTrack - Smart City Dashboard",
+  "uid": "trashtrack-kelompok6",
+  "version": 1
+}

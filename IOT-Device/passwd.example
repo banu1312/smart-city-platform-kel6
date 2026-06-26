@@ -1,1 +1,2 @@
-admin:$7$101$daYm5WER5lZcI6xJ$18lb6kgY7fbCFnpqyKfal2/Ee1O7qi6k18lqC8DNRvSjTQBwwOqQu+/XrwgWLNioMhBMdHCaL4ihHjdzalXhUQ==
+# Generate with:
+# mosquitto_passwd -c passwd admin
