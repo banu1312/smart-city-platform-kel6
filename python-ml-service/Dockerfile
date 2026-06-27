@@ -5,8 +5,13 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY main.py .
-COPY models/ ./models/
+COPY . .
+
+RUN mkdir -p models && \
+    python generate_data.py && \
+    python train_fill_rate.py && \
+    python train_priority_route.py && \
+    python train_anomaly.py
 
 EXPOSE 5000
 
