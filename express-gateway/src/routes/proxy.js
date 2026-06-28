@@ -38,15 +38,15 @@ const registerProxyRoutes = (app, authLimiter) => {
 
 	const protect = authLimiter ? [authLimiter, verifyJWT] : [verifyJWT];
 
-	// BACKEND LARAVEL (single service, port 8000) 
-	app.use("/api/bins",          ...protect, makeProxy(backendUrl));
-	app.use("/api/fleet",         ...protect, makeProxy(backendUrl));
-	app.use("/api/reports",       ...protect, makeProxy(backendUrl));
-
-	//Health check tiap domain di backend - publik, tanpa JWT
+	// Health check — publik, tanpa JWT (harus di atas route protected)
 	app.use("/api/smart-bin/health",      makeProxy(backendUrl));
 	app.use("/api/fleet/health",          makeProxy(backendUrl));
 	app.use("/api/citizen-report/health", makeProxy(backendUrl));
+
+	// BACKEND LARAVEL (single service, port 8000)
+	app.use("/api/bins",          ...protect, makeProxy(backendUrl));
+	app.use("/api/fleet",         ...protect, makeProxy(backendUrl));
+	app.use("/api/reports",       ...protect, makeProxy(backendUrl));
 
 	// PYTHON ML SERVICE (port 5000) 
 	app.use("/predict",  ...protect, makeProxy(mlUrl));

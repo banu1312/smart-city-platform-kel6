@@ -2,16 +2,17 @@
 	"info": {
 		"_postman_id": "smartcity-platform-full",
 		"name": "TrashTrack Smart City Platform",
-		"description": "Full API Collection — OAuth, Smart Bin, Fleet, Citizen Report, ML, IoT\n\nCara pakai:\n1. Import collection + environment\n2. Aktifkan environment 'Smart City - Local'\n3. Jalankan '1. Login Admin' dulu\n4. Jalankan '2. IoT Token' untuk test telemetry\n5. Test sisanya sesuai urutan folder",
+		"description": "Full API Collection — Kelompok 6\n\nUrutan demo:\n1. Jalankan 'Login Admin' dulu → accessToken terisi otomatis\n2. Jalankan 'IoT Token' → iotToken terisi otomatis\n3. Test sesuai skenario S1–S6\n\nUsers:\n- admin / admin123 (role: admin)\n- warga1 / warga123 (role: citizen)\n\nIoT client: iot-device / iot-secret",
 		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
 	},
 	"variable": [],
 	"item": [
 		{
 			"name": "0. Health Check",
+			"description": "Gunakan folder ini untuk demo S4 (Docker) dan S5 (K8s) — tunjukkan semua service up.",
 			"item": [
 				{
-					"name": "Gateway Health",
+					"name": "Gateway Health (5 services)",
 					"request": {
 						"method": "GET",
 						"header": [],
@@ -19,53 +20,111 @@
 					},
 					"event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
 						"pm.test('Status 200', () => pm.response.to.have.status(200));",
-						"pm.test('Gateway OK', () => pm.expect(pm.response.json().data.gateway).to.equal('ok'));"
+						"const json = pm.response.json();",
+						"pm.test('Gateway OK', () => pm.expect(json.data.gateway).to.equal('ok'));",
+						"pm.test('Overall OK', () => pm.expect(json.data.overall).to.equal('ok'));",
+						"pm.test('5 upstream services', () => pm.expect(json.data.services.length).to.equal(5));"
 					]}}]
 				},
 				{
-					"name": "OAuth Health",
+					"name": "IoT Status",
 					"request": {
 						"method": "GET",
 						"header": [],
-						"url": { "raw": "{{oauthUrl}}/health", "host": ["{{oauthUrl}}"], "path": ["health"] }
+						"url": { "raw": "{{baseUrl}}/iot/status", "host": ["{{baseUrl}}"], "path": ["iot", "status"] }
 					},
 					"event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
 						"pm.test('Status 200', () => pm.response.to.have.status(200));",
-						"pm.test('OAuth running', () => pm.expect(pm.response.json().service).to.equal('oauth-server'));"
+						"pm.test('IoT ready', () => pm.expect(pm.response.json().message).to.include('IoT Gateway is ready'));"
 					]}}]
 				},
 				{
-					"name": "ML Health",
+					"name": "Smart Bin Health",
 					"request": {
 						"method": "GET",
 						"header": [],
-						"url": { "raw": "http://localhost:5000/health", "host": ["http://localhost:5000"], "path": ["health"] }
+						"url": { "raw": "{{baseUrl}}/api/smart-bin/health", "host": ["{{baseUrl}}"], "path": ["api", "smart-bin", "health"] }
 					},
 					"event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
-						"pm.test('Status 200', () => pm.response.to.have.status(200));",
-						"pm.test('Models loaded', () => pm.expect(pm.response.json().models_loaded).to.equal(3));"
+						"pm.test('Status 200', () => pm.response.to.have.status(200));"
+					]}}]
+				},
+				{
+					"name": "Fleet Health",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": { "raw": "{{baseUrl}}/api/fleet/health", "host": ["{{baseUrl}}"], "path": ["api", "fleet", "health"] }
+					},
+					"event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+						"pm.test('Status 200', () => pm.response.to.have.status(200));"
+					]}}]
+				},
+				{
+					"name": "Citizen Report Health",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": { "raw": "{{baseUrl}}/api/citizen-report/health", "host": ["{{baseUrl}}"], "path": ["api", "citizen-report", "health"] }
+					},
+					"event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+						"pm.test('Status 200', () => pm.response.to.have.status(200));"
 					]}}]
 				}
 			]
 		},
 		{
-			"name": "1. OAuth",
+			"name": "1. OAuth (Auth)",
+			"description": "Jalankan 'Login Admin' dan 'IoT Token' sebelum test lainnya.",
 			"item": [
 				{
-					"name": "Login Admin (Password Grant)",
+					"name": "Login Admin",
 					"request": {
 						"method": "POST",
 						"header": [{ "key": "Content-Type", "value": "application/json" }],
-						"body": { "mode": "raw", "raw": "{\n  \"grant_type\": \"password\",\n  \"client_id\": \"{{clientId}}\",\n  \"client_secret\": \"{{clientSecret}}\",\n  \"username\": \"admin\",\n  \"password\": \"admin123\"\n}" },
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"grant_type\": \"password\",\n  \"client_id\": \"{{clientId}}\",\n  \"client_secret\": \"{{clientSecret}}\",\n  \"username\": \"admin\",\n  \"password\": \"admin123\"\n}"
+						},
 						"url": { "raw": "{{baseUrl}}/oauth/token", "host": ["{{baseUrl}}"], "path": ["oauth", "token"] }
 					},
 					"event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
 						"const json = pm.response.json();",
 						"pm.test('Status 200', () => pm.response.to.have.status(200));",
 						"pm.test('Has access_token', () => pm.expect(json.data).to.have.property('access_token'));",
+						"pm.test('Role admin', () => {",
+						"  const payload = JSON.parse(atob(json.data.access_token.split('.')[1]));",
+						"  pm.expect(payload.role).to.equal('admin');",
+						"});",
 						"if (json.data) {",
 						"  pm.environment.set('accessToken', json.data.access_token);",
 						"  pm.environment.set('refreshToken', json.data.refresh_token);",
+						"  console.log('accessToken saved!');",
+						"}"
+					]}}]
+				},
+				{
+					"name": "Login Warga (warga1)",
+					"request": {
+						"method": "POST",
+						"header": [{ "key": "Content-Type", "value": "application/json" }],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"grant_type\": \"password\",\n  \"client_id\": \"{{clientId}}\",\n  \"client_secret\": \"{{clientSecret}}\",\n  \"username\": \"warga1\",\n  \"password\": \"warga123\"\n}"
+						},
+						"url": { "raw": "{{baseUrl}}/oauth/token", "host": ["{{baseUrl}}"], "path": ["oauth", "token"] }
+					},
+					"event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+						"const json = pm.response.json();",
+						"pm.test('Status 200', () => pm.response.to.have.status(200));",
+						"pm.test('Has access_token', () => pm.expect(json.data).to.have.property('access_token'));",
+						"pm.test('Role citizen', () => {",
+						"  const payload = JSON.parse(atob(json.data.access_token.split('.')[1]));",
+						"  pm.expect(payload.role).to.equal('citizen');",
+						"});",
+						"if (json.data) {",
+						"  pm.environment.set('accessTokenWarga', json.data.access_token);",
+						"  console.log('accessTokenWarga saved!');",
 						"}"
 					]}}]
 				},
@@ -74,14 +133,20 @@
 					"request": {
 						"method": "POST",
 						"header": [{ "key": "Content-Type", "value": "application/json" }],
-						"body": { "mode": "raw", "raw": "{\n  \"grant_type\": \"client_credentials\",\n  \"client_id\": \"iot-device\",\n  \"client_secret\": \"iot-secret\"\n}" },
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"grant_type\": \"client_credentials\",\n  \"client_id\": \"{{iotClientId}}\",\n  \"client_secret\": \"{{iotClientSecret}}\"\n}"
+						},
 						"url": { "raw": "{{baseUrl}}/oauth/token", "host": ["{{baseUrl}}"], "path": ["oauth", "token"] }
 					},
 					"event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
 						"const json = pm.response.json();",
 						"pm.test('Status 200', () => pm.response.to.have.status(200));",
 						"pm.test('Scope is service', () => pm.expect(json.data.scope).to.equal('service'));",
-						"if (json.data) pm.environment.set('iotToken', json.data.access_token);"
+						"if (json.data) {",
+						"  pm.environment.set('iotToken', json.data.access_token);",
+						"  console.log('iotToken saved!');",
+						"}"
 					]}}]
 				},
 				{
@@ -89,7 +154,10 @@
 					"request": {
 						"method": "POST",
 						"header": [{ "key": "Content-Type", "value": "application/json" }],
-						"body": { "mode": "raw", "raw": "{\n  \"grant_type\": \"refresh_token\",\n  \"client_id\": \"{{clientId}}\",\n  \"client_secret\": \"{{clientSecret}}\",\n  \"refresh_token\": \"{{refreshToken}}\"\n}" },
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"grant_type\": \"refresh_token\",\n  \"client_id\": \"{{clientId}}\",\n  \"client_secret\": \"{{clientSecret}}\",\n  \"refresh_token\": \"{{refreshToken}}\"\n}"
+						},
 						"url": { "raw": "{{baseUrl}}/oauth/token", "host": ["{{baseUrl}}"], "path": ["oauth", "token"] }
 					},
 					"event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
@@ -100,14 +168,457 @@
 						"  pm.environment.set('refreshToken', json.data.refresh_token);",
 						"}"
 					]}}]
+				},
+				{
+					"name": "Introspect Token",
+					"request": {
+						"method": "POST",
+						"header": [
+							{ "key": "Authorization", "value": "Basic {{basicAuth}}" },
+							{ "key": "Content-Type", "value": "application/json" }
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"token\": \"{{accessToken}}\"\n}"
+						},
+						"url": { "raw": "{{baseUrl}}/oauth/introspect", "host": ["{{baseUrl}}"], "path": ["oauth", "introspect"] }
+					},
+					"event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+						"const json = pm.response.json();",
+						"pm.test('Status 200', () => pm.response.to.have.status(200));",
+						"pm.test('Token active', () => pm.expect(json.active).to.be.true);",
+						"pm.test('Username is admin', () => pm.expect(json.username).to.equal('admin'));"
+					]}}]
+				},
+				{
+					"name": "Revoke Token",
+					"request": {
+						"method": "POST",
+						"header": [{ "key": "Content-Type", "value": "application/json" }],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"token\": \"{{accessToken}}\"\n}"
+						},
+						"url": { "raw": "{{baseUrl}}/oauth/revoke", "host": ["{{baseUrl}}"], "path": ["oauth", "revoke"] }
+					},
+					"event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+						"pm.test('Status 200', () => pm.response.to.have.status(200));",
+						"pm.test('Revoked', () => pm.expect(pm.response.json().message).to.include('revoked'));"
+					]}}]
+				},
+				{
+					"name": "[401] Client Secret Salah",
+					"request": {
+						"method": "POST",
+						"header": [{ "key": "Content-Type", "value": "application/json" }],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"grant_type\": \"password\",\n  \"client_id\": \"smartcity-app\",\n  \"client_secret\": \"salah-secret\",\n  \"username\": \"admin\",\n  \"password\": \"admin123\"\n}"
+						},
+						"url": { "raw": "{{baseUrl}}/oauth/token", "host": ["{{baseUrl}}"], "path": ["oauth", "token"] }
+					},
+					"event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+						"pm.test('Status 401', () => pm.response.to.have.status(401));",
+						"pm.test('Invalid client', () => pm.expect(pm.response.json().message).to.include('Invalid client'));"
+					]}}]
 				}
 			]
 		},
 		{
-			"name": "2. Smart Bin",
+			"name": "[S1] IoT Data Ingestion",
+			"description": "Simulasi sensor tong sampah kirim telemetri lewat Gateway.\nRequires: iotToken (jalankan 'IoT Token' dulu).",
 			"item": [
 				{
-					"name": "List All Bins",
+					"name": "Telemetry Normal (BIN-Z1-01, 45%)",
+					"request": {
+						"method": "POST",
+						"header": [
+							{ "key": "Authorization", "value": "Bearer {{iotToken}}" },
+							{ "key": "Content-Type", "value": "application/json" }
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"bin_id\": \"BIN-Z1-01\",\n  \"fill_level\": 45.5,\n  \"gas_level\": 150,\n  \"temperature\": 30.0,\n  \"calibrated_height\": 98.0,\n  \"latitude\": -6.1944,\n  \"longitude\": 106.8318\n}"
+						},
+						"url": { "raw": "{{baseUrl}}/iot/telemetry", "host": ["{{baseUrl}}"], "path": ["iot", "telemetry"] }
+					},
+					"event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+						"const json = pm.response.json();",
+						"pm.test('Status 201', () => pm.response.to.have.status(201));",
+						"pm.test('ML predictions exist', () => pm.expect(json.data).to.have.property('ml_predictions'));",
+						"pm.test('No dispatch (fill not critical)', () => pm.expect(json.data.ml_predictions.dispatch).to.be.null);"
+					]}}]
+				},
+				{
+					"name": "Telemetry Critical → Auto-Dispatch (BIN-Z3-01, 95%)",
+					"request": {
+						"method": "POST",
+						"header": [
+							{ "key": "Authorization", "value": "Bearer {{iotToken}}" },
+							{ "key": "Content-Type", "value": "application/json" }
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"bin_id\": \"BIN-Z3-01\",\n  \"fill_level\": 95.0,\n  \"gas_level\": 600,\n  \"temperature\": 35.0,\n  \"calibrated_height\": 120.0,\n  \"latitude\": -6.2383,\n  \"longitude\": 106.8000\n}"
+						},
+						"url": { "raw": "{{baseUrl}}/iot/telemetry", "host": ["{{baseUrl}}"], "path": ["iot", "telemetry"] }
+					},
+					"event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+						"const json = pm.response.json();",
+						"pm.test('Status 201', () => pm.response.to.have.status(201));",
+						"pm.test('Priority Urgent/Critical', () => {",
+						"  const p = json.data.ml_predictions.priority;",
+						"  pm.expect(['Urgent','Critical']).to.include(p);",
+						"});",
+						"if (json.data && json.data.ml_predictions && json.data.ml_predictions.dispatch) {",
+						"  const sid = json.data.ml_predictions.dispatch.schedule_id;",
+						"  if (sid) {",
+						"    pm.environment.set('lastScheduleId', sid);",
+						"    console.log('lastScheduleId saved: ' + sid);",
+						"  }",
+						"}"
+					]}}]
+				},
+				{
+					"name": "[401] Telemetry Tanpa Token",
+					"request": {
+						"method": "POST",
+						"header": [{ "key": "Content-Type", "value": "application/json" }],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"bin_id\": \"BIN-Z1-01\",\n  \"fill_level\": 50.0\n}"
+						},
+						"url": { "raw": "{{baseUrl}}/iot/telemetry", "host": ["{{baseUrl}}"], "path": ["iot", "telemetry"] }
+					},
+					"event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+						"pm.test('Status 401 — Unauthorized', () => pm.response.to.have.status(401));"
+					]}}]
+				},
+				{
+					"name": "[401] Telemetry Pakai Token Admin (Bukan IoT)",
+					"request": {
+						"method": "POST",
+						"header": [
+							{ "key": "Authorization", "value": "Bearer {{accessToken}}" },
+							{ "key": "Content-Type", "value": "application/json" }
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"bin_id\": \"BIN-Z1-01\",\n  \"fill_level\": 50.0\n}"
+						},
+						"url": { "raw": "{{baseUrl}}/iot/telemetry", "host": ["{{baseUrl}}"], "path": ["iot", "telemetry"] }
+					},
+					"event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+						"pm.test('Status 401 atau 403 — Token bukan scope service', () => {",
+						"  pm.expect([401, 403]).to.include(pm.response.code);",
+						"});"
+					]}}]
+				}
+			]
+		},
+		{
+			"name": "[S2] Citizen Report",
+			"description": "Warga lapor masalah sampah. Admin verifikasi lalu dispatch truk.\nRequires: accessToken (Login Admin) atau accessTokenWarga (Login Warga).",
+			"item": [
+				{
+					"name": "Submit Laporan Warga (form-data + foto opsional)",
+					"request": {
+						"method": "POST",
+						"header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
+						"body": {
+							"mode": "formdata",
+							"formdata": [
+								{ "key": "reporter_name", "value": "Budi Santoso Demo", "type": "text" },
+								{ "key": "reporter_phone", "value": "081234560001", "type": "text" },
+								{ "key": "issue_description", "value": "Tong sampah BIN-Z1-01 meluber, butuh pengangkutan segera", "type": "text" },
+								{ "key": "geo_coordinate", "value": "-6.1944,106.8318", "type": "text" },
+								{ "key": "photo", "type": "file", "src": "", "disabled": true, "description": "Opsional — pilih file JPG/PNG max 2MB" }
+							]
+						},
+						"url": { "raw": "{{baseUrl}}/api/reports", "host": ["{{baseUrl}}"], "path": ["api", "reports"] },
+						"description": "Kirim laporan via form-data. Field 'photo' opsional — bisa dikosongkan untuk demo cepat."
+					},
+					"event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+						"const json = pm.response.json();",
+						"pm.test('Status 201', () => pm.response.to.have.status(201));",
+						"pm.test('Status Pending', () => pm.expect(json.data.verification_status).to.equal('Pending'));",
+						"pm.test('Reporter name correct', () => pm.expect(json.data.reporter_name).to.equal('Budi Santoso Demo'));",
+						"if (json.data && json.data.id) {",
+						"  pm.environment.set('lastReportId', json.data.id);",
+						"  console.log('lastReportId saved: ' + json.data.id);",
+						"}"
+					]}}]
+				},
+				{
+					"name": "Verify Laporan (Admin)",
+					"request": {
+						"method": "POST",
+						"header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
+						"url": {
+							"raw": "{{baseUrl}}/api/reports/{{lastReportId}}/verify",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "reports", "{{lastReportId}}", "verify"]
+						}
+					},
+					"event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+						"pm.test('Status 200', () => pm.response.to.have.status(200));",
+						"pm.test('Status Reviewed', () => pm.expect(pm.response.json().data.verification_status).to.equal('Reviewed'));"
+					]}}]
+				},
+				{
+					"name": "Dispatch Armada ke Laporan",
+					"request": {
+						"method": "POST",
+						"header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
+						"url": {
+							"raw": "{{baseUrl}}/api/reports/{{lastReportId}}/dispatch",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "reports", "{{lastReportId}}", "dispatch"]
+						}
+					},
+					"event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+						"const json = pm.response.json();",
+						"pm.test('Status 200', () => pm.response.to.have.status(200));",
+						"pm.test('Status Dispatched', () => pm.expect(json.data.report.verification_status).to.equal('Dispatched'));",
+						"pm.test('Truck assigned', () => pm.expect(json.data.truck).to.have.property('license_plate'));"
+					]}}]
+				},
+				{
+					"name": "[401] Submit Tanpa Token",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "formdata",
+							"formdata": [
+								{ "key": "reporter_name", "value": "Test", "type": "text" },
+								{ "key": "reporter_phone", "value": "08123456789", "type": "text" },
+								{ "key": "issue_description", "value": "Sampah menumpuk", "type": "text" },
+								{ "key": "geo_coordinate", "value": "-6.1944,106.8318", "type": "text" }
+							]
+						},
+						"url": { "raw": "{{baseUrl}}/api/reports", "host": ["{{baseUrl}}"], "path": ["api", "reports"] }
+					},
+					"event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+						"pm.test('Status 401 — Unauthorized', () => pm.response.to.have.status(401));"
+					]}}]
+				}
+			]
+		},
+		{
+			"name": "[S3] ML Predictions",
+			"description": "Model ML untuk prediksi fill rate, prioritas pickup, dan deteksi anomali.\nRequires: accessToken (Login Admin).",
+			"item": [
+				{
+					"name": "Predict Fill Rate (jam berapa penuh?)",
+					"request": {
+						"method": "POST",
+						"header": [
+							{ "key": "Authorization", "value": "Bearer {{accessToken}}" },
+							{ "key": "Content-Type", "value": "application/json" }
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"jam\": 14,\n  \"suhu_cuaca\": 32.0,\n  \"volume_sekarang\": 45.0,\n  \"latitude\": -6.1944,\n  \"longitude\": 106.8318,\n  \"is_weekend\": 0\n}"
+						},
+						"url": { "raw": "{{baseUrl}}/predict/fill-rate", "host": ["{{baseUrl}}"], "path": ["predict", "fill-rate"] },
+						"description": "Prediksi berapa jam lagi tong sampah akan penuh.\nField: jam (0-23), suhu_cuaca (Celcius), volume_sekarang (0-100%), latitude, longitude, is_weekend (0/1)"
+					},
+					"event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+						"pm.test('Status 200', () => pm.response.to.have.status(200));",
+						"pm.test('Has hours_until_full', () => pm.expect(pm.response.json()).to.have.property('hours_until_full'));",
+						"pm.test('hours_until_full is number', () => pm.expect(pm.response.json().hours_until_full).to.be.a('number'));"
+					]}}]
+				},
+				{
+					"name": "Predict Priority (tingkat prioritas pickup)",
+					"request": {
+						"method": "POST",
+						"header": [
+							{ "key": "Authorization", "value": "Bearer {{accessToken}}" },
+							{ "key": "Content-Type", "value": "application/json" }
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"volume_sekarang\": 85.0,\n  \"kadar_metana\": 30.0,\n  \"laporan_warga\": 3\n}"
+						},
+						"url": { "raw": "{{baseUrl}}/predict/priority", "host": ["{{baseUrl}}"], "path": ["predict", "priority"] },
+						"description": "Prediksi prioritas pengambilan sampah (Low/Medium/Urgent/Critical).\nField: volume_sekarang (0-100%), kadar_metana (ppm), laporan_warga (jumlah laporan)"
+					},
+					"event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+						"pm.test('Status 200', () => pm.response.to.have.status(200));",
+						"pm.test('Has pickup_priority', () => pm.expect(pm.response.json()).to.have.property('pickup_priority'));",
+						"pm.test('Priority valid', () => {",
+						"  const p = pm.response.json().pickup_priority;",
+						"  pm.expect(['Low','Medium','Urgent','Critical']).to.include(p);",
+						"});"
+					]}}]
+				},
+				{
+					"name": "Predict Priority — Critical Scenario",
+					"request": {
+						"method": "POST",
+						"header": [
+							{ "key": "Authorization", "value": "Bearer {{accessToken}}" },
+							{ "key": "Content-Type", "value": "application/json" }
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"volume_sekarang\": 95.0,\n  \"kadar_metana\": 600.0,\n  \"laporan_warga\": 8\n}"
+						},
+						"url": { "raw": "{{baseUrl}}/predict/priority", "host": ["{{baseUrl}}"], "path": ["predict", "priority"] }
+					},
+					"event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+						"pm.test('Status 200', () => pm.response.to.have.status(200));",
+						"pm.test('Priority Urgent or Critical', () => {",
+						"  const p = pm.response.json().pickup_priority;",
+						"  pm.expect(['Urgent','Critical']).to.include(p);",
+						"});"
+					]}}]
+				},
+				{
+					"name": "Detect Anomaly (sensor berperilaku aneh?)",
+					"request": {
+						"method": "POST",
+						"header": [
+							{ "key": "Authorization", "value": "Bearer {{accessToken}}" },
+							{ "key": "Content-Type", "value": "application/json" }
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"jarak_ultrasonik\": 25.0,\n  \"delta_volume_sec\": -5.5,\n  \"suhu_cuaca\": 38.2\n}"
+						},
+						"url": { "raw": "{{baseUrl}}/detect/anomaly", "host": ["{{baseUrl}}"], "path": ["detect", "anomaly"] },
+						"description": "Deteksi anomali pada sensor tong sampah.\nField: jarak_ultrasonik (cm), delta_volume_sec (perubahan volume/detik), suhu_cuaca (Celcius)"
+					},
+					"event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+						"pm.test('Status 200', () => pm.response.to.have.status(200));",
+						"pm.test('Has is_anomaly', () => pm.expect(pm.response.json()).to.have.property('is_anomaly'));",
+						"pm.test('Anomaly detected (true untuk data ekstrem)', () => pm.expect(pm.response.json().is_anomaly).to.be.true);"
+					]}}]
+				},
+				{
+					"name": "Detect Anomaly — Normal Scenario",
+					"request": {
+						"method": "POST",
+						"header": [
+							{ "key": "Authorization", "value": "Bearer {{accessToken}}" },
+							{ "key": "Content-Type", "value": "application/json" }
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"jarak_ultrasonik\": 80.0,\n  \"delta_volume_sec\": 0.1,\n  \"suhu_cuaca\": 29.0\n}"
+						},
+						"url": { "raw": "{{baseUrl}}/detect/anomaly", "host": ["{{baseUrl}}"], "path": ["detect", "anomaly"] }
+					},
+					"event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+						"pm.test('Status 200', () => pm.response.to.have.status(200));",
+						"pm.test('No anomaly (normal data)', () => pm.expect(pm.response.json().is_anomaly).to.be.false);"
+					]}}]
+				},
+				{
+					"name": "[401] Predict Tanpa Token",
+					"request": {
+						"method": "POST",
+						"header": [{ "key": "Content-Type", "value": "application/json" }],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"volume_sekarang\": 85.0,\n  \"kadar_metana\": 30.0,\n  \"laporan_warga\": 3\n}"
+						},
+						"url": { "raw": "{{baseUrl}}/predict/priority", "host": ["{{baseUrl}}"], "path": ["predict", "priority"] }
+					},
+					"event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+						"pm.test('Status 401 — JWT Required', () => pm.response.to.have.status(401));"
+					]}}]
+				}
+			]
+		},
+		{
+			"name": "[S6] Fleet Management & Dispatch",
+			"description": "Manajemen armada truk sampah. Auto-dispatch dipicu oleh IoT telemetry critical.\nRequires: accessToken (Login Admin).",
+			"item": [
+				{
+					"name": "List Semua Truk",
+					"request": {
+						"method": "GET",
+						"header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
+						"url": { "raw": "{{baseUrl}}/api/fleet/trucks", "host": ["{{baseUrl}}"], "path": ["api", "fleet", "trucks"] }
+					},
+					"event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+						"pm.test('Status 200', () => pm.response.to.have.status(200));",
+						"pm.test('Has trucks array', () => pm.expect(pm.response.json().data).to.be.an('array'));",
+						"pm.test('Has 10 trucks from seed', () => pm.expect(pm.response.json().data.length).to.be.at.least(10));"
+					]}}]
+				},
+				{
+					"name": "Register Truk Baru",
+					"request": {
+						"method": "POST",
+						"header": [
+							{ "key": "Authorization", "value": "Bearer {{accessToken}}" },
+							{ "key": "Content-Type", "value": "application/json" }
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"license_plate\": \"B 9999 DEMO\",\n  \"driver_name\": \"Driver Demo\",\n  \"max_capacity_ton\": 2.0\n}"
+						},
+						"url": { "raw": "{{baseUrl}}/api/fleet/trucks", "host": ["{{baseUrl}}"], "path": ["api", "fleet", "trucks"] }
+					},
+					"event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+						"pm.test('Status 201', () => pm.response.to.have.status(201));",
+						"pm.test('Truck created', () => pm.expect(pm.response.json().data.license_plate).to.equal('B 9999 DEMO'));"
+					]}}]
+				},
+				{
+					"name": "Driver Check-In (Truk Siap Bertugas)",
+					"request": {
+						"method": "POST",
+						"header": [
+							{ "key": "Authorization", "value": "Bearer {{accessToken}}" },
+							{ "key": "Content-Type", "value": "application/json" }
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"license_plate\": \"B 1234 ABC\"\n}"
+						},
+						"url": { "raw": "{{baseUrl}}/api/fleet/driver-checkin", "host": ["{{baseUrl}}"], "path": ["api", "fleet", "driver-checkin"] }
+					},
+					"event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+						"pm.test('Status 200', () => pm.response.to.have.status(200));",
+						"pm.test('Status Available', () => pm.expect(pm.response.json().data.current_status).to.equal('Available'));"
+					]}}]
+				},
+				{
+					"name": "Update Status Schedule (Selesai Pickup)",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{ "key": "Authorization", "value": "Bearer {{accessToken}}" },
+							{ "key": "Content-Type", "value": "application/json" }
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"execution_status\": \"Completed\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/fleet/schedules/{{lastScheduleId}}/status",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "fleet", "schedules", "{{lastScheduleId}}", "status"]
+						},
+						"description": "lastScheduleId diisi otomatis saat Telemetry Critical trigger auto-dispatch."
+					},
+					"event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+						"pm.test('Status 200', () => pm.response.to.have.status(200));"
+					]}}]
+				}
+			]
+		},
+		{
+			"name": "Smart Bin",
+			"description": "Manajemen tong sampah dan monitoring status.\nRequires: accessToken (Login Admin).",
+			"item": [
+				{
+					"name": "List Semua Tong Sampah",
 					"request": {
 						"method": "GET",
 						"header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
@@ -116,11 +627,11 @@
 					"event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
 						"pm.test('Status 200', () => pm.response.to.have.status(200));",
 						"pm.test('Has bins array', () => pm.expect(pm.response.json().data).to.be.an('array'));",
-						"pm.test('Has 10 bins', () => pm.expect(pm.response.json().data.length).to.equal(10));"
+						"pm.test('Has 10 bins from seed', () => pm.expect(pm.response.json().data.length).to.equal(10));"
 					]}}]
 				},
 				{
-					"name": "Detail Bin (id=1)",
+					"name": "Detail Tong (BIN-Z1-01, id=1)",
 					"request": {
 						"method": "GET",
 						"header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
@@ -132,7 +643,7 @@
 					]}}]
 				},
 				{
-					"name": "Set Bin Maintenance (id=4)",
+					"name": "Set Tong Maintenance (id=4)",
 					"request": {
 						"method": "PUT",
 						"header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
@@ -141,243 +652,6 @@
 					"event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
 						"pm.test('Status 200', () => pm.response.to.have.status(200));",
 						"pm.test('Status is Maintenance', () => pm.expect(pm.response.json().data.status).to.equal('Maintenance'));"
-					]}}]
-				}
-			]
-		},
-		{
-			"name": "3. IoT Telemetry",
-			"item": [
-				{
-					"name": "Telemetry Normal (BIN-Z1-01)",
-					"request": {
-						"method": "POST",
-						"header": [
-							{ "key": "Authorization", "value": "Bearer {{iotToken}}" },
-							{ "key": "Content-Type", "value": "application/json" }
-						],
-						"body": { "mode": "raw", "raw": "{\n  \"bin_id\": \"BIN-Z1-01\",\n  \"fill_level\": 45.5,\n  \"gas_level\": 150,\n  \"temperature\": 30.0,\n  \"calibrated_height\": 98.0,\n  \"latitude\": -6.1944,\n  \"longitude\": 106.8318\n}" },
-						"url": { "raw": "{{baseUrl}}/iot/telemetry", "host": ["{{baseUrl}}"], "path": ["iot", "telemetry"] }
-					},
-					"event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
-						"const json = pm.response.json();",
-						"pm.test('Status 201', () => pm.response.to.have.status(201));",
-						"pm.test('Volume updated', () => pm.expect(json.data.current_volume_percentage).to.equal(45.5));",
-						"pm.test('Tinggi updated', () => pm.expect(json.data.tinggi).to.equal(98));",
-						"pm.test('ML predictions exist', () => pm.expect(json.data).to.have.property('ml_predictions'));",
-						"pm.test('No dispatch (not critical)', () => pm.expect(json.data.ml_predictions.dispatch).to.be.null);"
-					]}}]
-				},
-				{
-					"name": "Telemetry Critical — Trigger Auto-Dispatch (BIN-Z3-01)",
-					"request": {
-						"method": "POST",
-						"header": [
-							{ "key": "Authorization", "value": "Bearer {{iotToken}}" },
-							{ "key": "Content-Type", "value": "application/json" }
-						],
-						"body": { "mode": "raw", "raw": "{\n  \"bin_id\": \"BIN-Z3-01\",\n  \"fill_level\": 95.0,\n  \"gas_level\": 600,\n  \"temperature\": 35.0,\n  \"calibrated_height\": 120.0,\n  \"latitude\": -6.2383,\n  \"longitude\": 106.8000\n}" },
-						"url": { "raw": "{{baseUrl}}/iot/telemetry", "host": ["{{baseUrl}}"], "path": ["iot", "telemetry"] }
-					},
-					"event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
-						"const json = pm.response.json();",
-						"pm.test('Status 201', () => pm.response.to.have.status(201));",
-						"pm.test('Priority is Urgent or Critical', () => {",
-						"  const p = json.data.ml_predictions.priority;",
-						"  pm.expect(['Urgent','Critical']).to.include(p);",
-						"});",
-						"pm.test('Dispatch triggered', () => {",
-						"  const d = json.data.ml_predictions.dispatch;",
-						"  pm.expect(d).to.not.be.null;",
-						"  if (d && d.schedule_id) pm.environment.set('lastScheduleId', d.schedule_id);",
-						"});"
-					]}}]
-				},
-				{
-					"name": "[401] Telemetry Tanpa Token",
-					"request": {
-						"method": "POST",
-						"header": [{ "key": "Content-Type", "value": "application/json" }],
-						"body": { "mode": "raw", "raw": "{\n  \"bin_id\": \"BIN-Z1-01\",\n  \"fill_level\": 50.0\n}" },
-						"url": { "raw": "{{baseUrl}}/iot/telemetry", "host": ["{{baseUrl}}"], "path": ["iot", "telemetry"] }
-					},
-					"event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
-						"pm.test('Status 401', () => pm.response.to.have.status(401));"
-					]}}]
-				}
-			]
-		},
-		{
-			"name": "4. ML Predictions",
-			"item": [
-				{
-					"name": "Predict Fill Rate",
-					"request": {
-						"method": "POST",
-						"header": [
-							{ "key": "Authorization", "value": "Bearer {{accessToken}}" },
-							{ "key": "Content-Type", "value": "application/json" }
-						],
-						"body": { "mode": "raw", "raw": "{\n  \"jam\": 14,\n  \"suhu_cuaca\": 32.0,\n  \"volume_sekarang\": 45.0,\n  \"latitude\": -6.1944,\n  \"longitude\": 106.8318,\n  \"is_weekend\": 0\n}" },
-						"url": { "raw": "{{baseUrl}}/predict/fill-rate", "host": ["{{baseUrl}}"], "path": ["predict", "fill-rate"] }
-					},
-					"event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
-						"pm.test('Status 200', () => pm.response.to.have.status(200));",
-						"pm.test('Has hours_until_full', () => pm.expect(pm.response.json()).to.have.property('hours_until_full'));"
-					]}}]
-				},
-				{
-					"name": "Predict Priority",
-					"request": {
-						"method": "POST",
-						"header": [
-							{ "key": "Authorization", "value": "Bearer {{accessToken}}" },
-							{ "key": "Content-Type", "value": "application/json" }
-						],
-						"body": { "mode": "raw", "raw": "{\n  \"volume_sekarang\": 85.0,\n  \"kadar_metana\": 30.0,\n  \"laporan_warga\": 3\n}" },
-						"url": { "raw": "{{baseUrl}}/predict/priority", "host": ["{{baseUrl}}"], "path": ["predict", "priority"] }
-					},
-					"event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
-						"pm.test('Status 200', () => pm.response.to.have.status(200));",
-						"pm.test('Has pickup_priority', () => {",
-						"  const p = pm.response.json().pickup_priority;",
-						"  pm.expect(['Low','Medium','Urgent','Critical']).to.include(p);",
-						"});"
-					]}}]
-				},
-				{
-					"name": "Detect Anomaly",
-					"request": {
-						"method": "POST",
-						"header": [
-							{ "key": "Authorization", "value": "Bearer {{accessToken}}" },
-							{ "key": "Content-Type", "value": "application/json" }
-						],
-						"body": { "mode": "raw", "raw": "{\n  \"jarak_ultrasonik\": 25.0,\n  \"delta_volume_sec\": -5.5,\n  \"suhu_cuaca\": 38.2\n}" },
-						"url": { "raw": "{{baseUrl}}/detect/anomaly", "host": ["{{baseUrl}}"], "path": ["detect", "anomaly"] }
-					},
-					"event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
-						"pm.test('Status 200', () => pm.response.to.have.status(200));",
-						"pm.test('Anomaly detected', () => pm.expect(pm.response.json().is_anomaly).to.be.true);"
-					]}}]
-				}
-			]
-		},
-		{
-			"name": "5. Fleet",
-			"item": [
-				{
-					"name": "List All Trucks",
-					"request": {
-						"method": "GET",
-						"header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
-						"url": { "raw": "{{baseUrl}}/api/fleet/trucks", "host": ["{{baseUrl}}"], "path": ["api", "fleet", "trucks"] }
-					},
-					"event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
-						"pm.test('Status 200', () => pm.response.to.have.status(200));",
-						"pm.test('Has trucks', () => pm.expect(pm.response.json().data).to.be.an('array'));"
-					]}}]
-				},
-				{
-					"name": "Register New Truck",
-					"request": {
-						"method": "POST",
-						"header": [
-							{ "key": "Authorization", "value": "Bearer {{accessToken}}" },
-							{ "key": "Content-Type", "value": "application/json" }
-						],
-						"body": { "mode": "raw", "raw": "{\n  \"license_plate\": \"B 9999 TST\",\n  \"driver_name\": \"Test Driver\",\n  \"max_capacity_ton\": 2.0\n}" },
-						"url": { "raw": "{{baseUrl}}/api/fleet/trucks", "host": ["{{baseUrl}}"], "path": ["api", "fleet", "trucks"] }
-					},
-					"event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
-						"pm.test('Status 201', () => pm.response.to.have.status(201));",
-						"pm.test('Truck created', () => pm.expect(pm.response.json().data.license_plate).to.equal('B 9999 TST'));"
-					]}}]
-				},
-				{
-					"name": "Driver Check-In",
-					"request": {
-						"method": "POST",
-						"header": [
-							{ "key": "Authorization", "value": "Bearer {{accessToken}}" },
-							{ "key": "Content-Type", "value": "application/json" }
-						],
-						"body": { "mode": "raw", "raw": "{\n  \"license_plate\": \"B 9999 TST\"\n}" },
-						"url": { "raw": "{{baseUrl}}/api/fleet/driver-checkin", "host": ["{{baseUrl}}"], "path": ["api", "fleet", "driver-checkin"] }
-					},
-					"event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
-						"pm.test('Status 200', () => pm.response.to.have.status(200));",
-						"pm.test('Status Available', () => pm.expect(pm.response.json().data.current_status).to.equal('Available'));"
-					]}}]
-				},
-				{
-					"name": "Complete Schedule",
-					"request": {
-						"method": "PUT",
-						"header": [
-							{ "key": "Authorization", "value": "Bearer {{accessToken}}" },
-							{ "key": "Content-Type", "value": "application/json" }
-						],
-						"body": { "mode": "raw", "raw": "{\n  \"execution_status\": \"Completed\"\n}" },
-						"url": { "raw": "{{baseUrl}}/api/fleet/schedules/{{lastScheduleId}}/status", "host": ["{{baseUrl}}"], "path": ["api", "fleet", "schedules", "{{lastScheduleId}}", "status"] }
-					},
-					"event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
-						"pm.test('Status 200', () => pm.response.to.have.status(200));"
-					]}}]
-				}
-			]
-		},
-		{
-			"name": "6. Citizen Report",
-			"item": [
-				{
-					"name": "Submit Report (form-data + photo)",
-					"request": {
-						"method": "POST",
-						"header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
-						"body": {
-							"mode": "formdata",
-							"formdata": [
-								{ "key": "reporter_name", "value": "Budi Santoso", "type": "text" },
-								{ "key": "reporter_phone", "value": "081234567001", "type": "text" },
-								{ "key": "issue_description", "value": "Tong sampah meluber di depan pasar", "type": "text" },
-								{ "key": "geo_coordinate", "value": "-6.1944,106.8318", "type": "text" },
-								{ "key": "photo", "type": "file", "src": "" }
-							]
-						},
-						"url": { "raw": "{{baseUrl}}/api/reports", "host": ["{{baseUrl}}"], "path": ["api", "reports"] },
-						"description": "Upload foto JPG/PNG (max 2MB). Klik 'Select Files' di field photo."
-					},
-					"event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
-						"const json = pm.response.json();",
-						"pm.test('Status 201', () => pm.response.to.have.status(201));",
-						"pm.test('Status Pending', () => pm.expect(json.data.verification_status).to.equal('Pending'));",
-						"if (json.data) pm.environment.set('lastReportId', json.data.id);"
-					]}}]
-				},
-				{
-					"name": "Verify Report",
-					"request": {
-						"method": "POST",
-						"header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
-						"url": { "raw": "{{baseUrl}}/api/reports/{{lastReportId}}/verify", "host": ["{{baseUrl}}"], "path": ["api", "reports", "{{lastReportId}}", "verify"] }
-					},
-					"event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
-						"pm.test('Status 200', () => pm.response.to.have.status(200));",
-						"pm.test('Status Reviewed', () => pm.expect(pm.response.json().data.verification_status).to.equal('Reviewed'));"
-					]}}]
-				},
-				{
-					"name": "Dispatch Truck to Report",
-					"request": {
-						"method": "POST",
-						"header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
-						"url": { "raw": "{{baseUrl}}/api/reports/{{lastReportId}}/dispatch", "host": ["{{baseUrl}}"], "path": ["api", "reports", "{{lastReportId}}", "dispatch"] }
-					},
-					"event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
-						"pm.test('Status 200', () => pm.response.to.have.status(200));",
-						"pm.test('Status Dispatched', () => pm.expect(pm.response.json().data.report.verification_status).to.equal('Dispatched'));",
-						"pm.test('Truck assigned', () => pm.expect(pm.response.json().data.truck).to.have.property('license_plate'));"
 					]}}]
 				}
 			]
