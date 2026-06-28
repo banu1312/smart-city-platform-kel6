@@ -2,6 +2,25 @@
 
 Platform smart city untuk manajemen sampah pintar berbasis IoT, Machine Learning, dan microservices. Sistem ini memonitor tong sampah secara real-time, memprediksi waktu penuh, mendeteksi anomali, dan otomatis meng-dispatch truk pengangkut.
 
+## Daftar Isi
+
+- [Arsitektur](#arsitektur)
+- [Tech Stack](#tech-stack)
+- [Struktur Folder](#struktur-folder)
+- [Prerequisites](#prerequisites)
+- [Setup Environment (.env)](#setup-environment-env)
+- [Cara Jalankan di Lokal](#cara-jalankan-di-lokal)
+- [Cara Jalankan via Docker Compose](#cara-jalankan-via-docker-compose)
+- [Cara Jalankan di Server (Kubernetes)](#cara-jalankan-di-server-kubernetes)
+- [Setup IoT (Opsional)](#setup-iot-opsional)
+- [Data Flow End-to-End](#data-flow-end-to-end)
+- [API Endpoints](#api-endpoints)
+- [Testing dengan Postman](#testing-dengan-postman)
+- [Monitoring](#monitoring)
+- [Akun & Kredensial Default](#akun--kredensial-default)
+- [Troubleshooting](#troubleshooting)
+- [Catatan Keamanan](#catatan-keamanan)
+
 ## Arsitektur
 
 ```
@@ -25,33 +44,149 @@ ESP32 / Simulator ──MQTT──> Mosquitto/HiveMQ ──> Node-RED ──> Ex
 | Laravel Backend | 8000 | PHP 8.2, Laravel 12, RabbitMQ |
 | Python ML Service | 5000 | Python 3.11, FastAPI, scikit-learn |
 | MySQL | 3306 | MySQL 8.0 |
-| RabbitMQ | 5672 | RabbitMQ 3.12 |
+| RabbitMQ | 5672 (AMQP), 15672 (UI) | RabbitMQ 3.12 |
 | Mosquitto | 1883 | Eclipse Mosquitto 2.0 |
 | Node-RED | 1880 | Node-RED |
+| Prometheus | 9090 | Monitoring metrics |
+| Grafana | 3001 | Dashboard monitoring |
 
-## Prasyarat
+## Tech Stack
 
-- **PHP** 8.2+ dengan extension: pdo_mysql, mbstring, sockets, gd, zip
-- **Composer** 2.x
-- **Node.js** 18+ dengan npm
-- **Python** 3.11+ dengan pip
-- **MySQL** 8.0 (lokal atau Docker)
-- **Docker Desktop** (untuk MySQL & RabbitMQ, opsional)
-- **PlatformIO** (untuk IoT Device, opsional)
+| Layer | Teknologi |
+|-------|-----------|
+| IoT Device | ESP32, HC-SR04 (ultrasonik), MQ-2 (gas), PlatformIO |
+| IoT Simulator | Python, paho-mqtt |
+| MQTT Broker | Eclipse Mosquitto 2.0, HiveMQ (publik, untuk Wokwi) |
+| IoT Bridge | Node-RED |
+| API Gateway | Express.js, JWT, rate limiting, http-proxy-middleware |
+| Auth | OAuth 2.0 (password, client_credentials, refresh_token), bcrypt |
+| Backend | Laravel 12, PHP 8.2, Eloquent ORM |
+| ML | FastAPI, scikit-learn (RandomForest, GradientBoosting, Isolation Forest) |
+| Database | MySQL 8.0 |
+| Message Broker | RabbitMQ 3.12 (topic exchange) |
+| Container & Orkestrasi | Docker, Docker Compose, Kubernetes |
+| Monitoring | Prometheus, Grafana |
 
-## Quick Start (Lokal)
+## Struktur Folder
 
-### 1. Clone & Masuk
+```
+smart-city-platform-kel6/
+├── backend/                  # Laravel 12 API (PHP 8.2)
+│   ├── app/
+│   │   ├── Http/Controllers/ # SmartBin, Fleet, CitizenReport
+│   │   ├── Models/           # TrashBin, SensorLog, Truck, Schedule, SanitationReport
+│   │   ├── Services/         # RabbitMQPublisher, MLClient
+│   │   └── Http/Requests/    # Form validation
+│   ├── database/migrations/  # Schema definitions
+│   └── database/seeders/     # Sample data (10 bins, 10 trucks, dst)
+│
+├── express-gateway/          # API Gateway (Node.js)
+│   └── src/{middleware,routes}/
+│
+├── oauth-server/              # OAuth 2.0 Server (Node.js)
+│   └── src/{models,routes}/
+│
+├── python-ml-service/        # ML Prediction Service (FastAPI)
+│   ├── main.py
+│   ├── train_fill_rate.py / train_priority_route.py / train_anomaly.py
+│   ├── generate_data.py
+│   └── notebooks/EDA.ipynb
+│
+├── IOT-Device/                # PlatformIO ESP32 project + Node-RED
+│   ├── src/main.cpp
+│   ├── diagram.json / platformio.ini / wokwi.toml
+│   └── node-red-data/        # Flow bridge IoT → Gateway
+│
+├── database/                  # Raw SQL schema + seed
+├── k8s/                       # Manifest Kubernetes (production)
+├── monitoring/                 # Konfigurasi Prometheus & Grafana
+├── postman/                    # API collection + environment
+├── docker-compose.yml          # Full stack (production-like, lokal)
+├── docker-compose.dev.yml      # (kosong - reserved untuk override dev, lihat catatan)
+└── .env.example                # Variabel untuk docker-compose
+```
+
+## Prerequisites
+
+Pastikan tools berikut sudah terpasang sebelum mulai:
+
+| Tool | Versi Minimum | Wajib Untuk |
+|------|----------------|-------------|
+| PHP | 8.2+ (ekstensi: `pdo_mysql`, `mbstring`, `sockets`, `gd`, `zip`) | Backend Laravel |
+| Composer | 2.x | Backend Laravel |
+| Node.js | 18+ (dengan npm) | Express Gateway, OAuth Server, Node-RED |
+| Python | 3.11+ (dengan pip) | Python ML Service, IoT Simulator |
+| MySQL | 8.0 | Database (lokal atau via Docker) |
+| Docker & Docker Compose | terbaru | Menjalankan full stack / infrastruktur |
+| Git | terbaru | Clone repository |
+| Postman | terbaru | Testing API (opsional) |
+| PlatformIO + VS Code | terbaru | Simulasi ESP32 via Wokwi (opsional) |
+| kubectl | sesuai versi cluster | Deploy ke Kubernetes (opsional, hanya untuk server) |
+
+## Setup Environment (.env)
+
+Repo ini punya **beberapa file `.env` terpisah** karena setiap service berjalan independen. Salin semua `.env.example` menjadi `.env` lalu sesuaikan nilainya.
+
+| File | Lokasi | Dipakai Untuk |
+|------|--------|----------------|
+| `.env.example` | root | Variabel `docker-compose.yml` (password DB, JWT, RabbitMQ, MQTT, Grafana) |
+| `backend/.env.example` | `backend/` | Konfigurasi Laravel (DB, RabbitMQ, ML service URL) |
+| `express-gateway/.env.example` | `express-gateway/` | JWT secret, URL upstream (OAuth/Backend/ML) |
+| `oauth-server/.env.example` | `oauth-server/` | JWT secret (harus identik dengan gateway) |
+| `IOT-Device/node-red-data/.env.example` | `IOT-Device/node-red-data/` | Kredensial MQTT & OAuth untuk bridge Node-RED |
+| `iot/.env` (dibuat manual) | `iot/` | Kredensial MQTT untuk simulator Python |
+
+> **Penting:** nilai `JWT_SECRET` **harus identik** di `express-gateway/.env` dan `oauth-server/.env`. Token yang diterbitkan OAuth Server tidak akan terverifikasi Gateway jika secret berbeda.
+
+### Variabel kunci di `.env` root (untuk Docker Compose)
+
+```env
+# --- Database ---
+MYSQL_ROOT_PASSWORD=ganti_dengan_password_kuat
+DB_DATABASE=smartcity
+DB_USERNAME=root
+DB_PASSWORD=ganti_dengan_password_kuat
+
+# --- Laravel App Key (generate dengan: php artisan key:generate --show) ---
+APP_KEY=base64:GANTI_DENGAN_OUTPUT_ARTISAN_KEY_GENERATE
+
+# --- JWT (harus sama persis di semua service) ---
+JWT_SECRET=ganti_dengan_secret_panjang_minimum_32_karakter
+JWT_EXPIRES_IN=1h
+JWT_REFRESH_EXPIRES_IN=7d
+
+# --- RabbitMQ ---
+RABBITMQ_USER=trashtrack
+RABBITMQ_PASS=ganti_dengan_password_rabbitmq
+
+# --- MQTT Mosquitto ---
+MQTT_ADMIN_PASSWORD=ganti_dengan_password_mqtt_admin
+MQTT_IOT_PASSWORD=ganti_dengan_password_mqtt_iot
+
+# --- Grafana ---
+GRAFANA_PASSWORD=ganti_dengan_password_grafana
+```
+
+Generate `APP_KEY` dengan masuk ke folder `backend/` lalu jalankan:
+```bash
+php artisan key:generate --show
+```
+Salin hasilnya ke variabel `APP_KEY` di `.env` root **dan** di `backend/.env`.
+
+## Cara Jalankan di Lokal
+
+Cocok untuk development, tanpa Docker (kecuali untuk MySQL & RabbitMQ).
+
+### 1. Clone Repository
 
 ```bash
 git clone https://github.com/banu1312/smart-city-platform-kel6.git
 cd smart-city-platform-kel6
 ```
 
-### 2. Start Infrastruktur (MySQL + RabbitMQ)
+### 2. Siapkan Infrastruktur (MySQL + RabbitMQ)
 
-Pakai Docker (paling gampang):
-
+Paling mudah pakai Docker:
 ```bash
 docker run -d --name trashtrack-mysql \
   -e MYSQL_ROOT_PASSWORD=rootpass \
@@ -61,8 +196,7 @@ docker run -d --name trashtrack-mysql \
 docker run -d --name trashtrack-rabbitmq \
   -p 5672:5672 -p 15672:15672 rabbitmq:3.12-management
 ```
-
-Atau pakai MySQL lokal (XAMPP/Laragon) — buat database `smartcity` manual.
+Atau gunakan MySQL lokal (XAMPP/Laragon) — buat database `smartcity` secara manual.
 
 ### 3. Backend Laravel (Terminal 1)
 
@@ -71,7 +205,7 @@ cd backend
 cp .env.example .env
 ```
 
-Edit `backend/.env` sesuaikan untuk lokal:
+Edit `backend/.env` untuk lokal:
 ```env
 APP_ENV=local
 APP_DEBUG=true
@@ -81,22 +215,21 @@ ML_SERVICE_URL=http://localhost:5000
 DB_HOST=127.0.0.1
 DB_DATABASE=smartcity
 DB_USERNAME=root
-DB_PASSWORD=rootpass        # sesuaikan password MySQL
+DB_PASSWORD=rootpass        # sesuaikan dengan password MySQL kalian
 
 RABBITMQ_HOST=127.0.0.1
 ```
 
 Lalu jalankan:
 ```bash
-composer install
+composer install --ignore-platform-req=ext-sockets
 php artisan key:generate
 php artisan migrate
 php artisan db:seed
 php artisan storage:link
 php artisan serve --port=8000
 ```
-
-> Biarkan terminal ini terbuka. Jangan ditutup.
+> Biarkan terminal ini terbuka.
 
 ### 4. OAuth Server (Terminal 2)
 
@@ -106,8 +239,7 @@ cp .env.example .env
 npm install
 node src/index.js
 ```
-
-Output: `[OAuth Server] Running on port 3002`
+Output yang diharapkan: `[OAuth Server] Running on port 3002`
 
 ### 5. Python ML Service (Terminal 3)
 
@@ -117,14 +249,13 @@ python -m venv venv
 
 # Windows
 venv\Scripts\activate
-
 # Linux/Mac
 source venv/bin/activate
 
 pip install -r requirements.txt
 ```
 
-**Pertama kali — train model dulu:**
+**Pertama kali — generate data & train model dulu:**
 ```bash
 python generate_data.py
 python train_fill_rate.py
@@ -136,7 +267,6 @@ python train_anomaly.py
 ```bash
 python -m uvicorn main:app --host 0.0.0.0 --port 5000
 ```
-
 Output: `Uvicorn running on http://0.0.0.0:5000`
 
 ### 6. Express Gateway (Terminal 4)
@@ -158,13 +288,12 @@ OAUTH_SERVER_URL=http://localhost:3002
 npm install
 node src/index.js
 ```
-
 Output: `[API Gateway] Running on port 3000`
 
-### 7. Verifikasi Semua Jalan
+### 7. Verifikasi Semua Service Jalan
 
 ```bash
-# Health check (semua service)
+# Health check semua service
 curl http://localhost:3000/health
 
 # Login ambil token
@@ -172,19 +301,165 @@ curl -X POST http://localhost:3000/oauth/token \
   -H "Content-Type: application/json" \
   -d '{"grant_type":"password","client_id":"smartcity-app","client_secret":"smartcity-secret","username":"admin","password":"admin123"}'
 
-# Test ambil data bins (ganti <TOKEN> dengan access_token dari response atas)
+# Test ambil data bins (ganti <TOKEN> dengan access_token dari response di atas)
 curl http://localhost:3000/api/bins \
   -H "Authorization: Bearer <TOKEN>"
 ```
 
-## Setup IoT (Opsional — untuk test end-to-end)
+## Cara Jalankan via Docker Compose
+
+Cocok untuk menjalankan semua service sekaligus tanpa setup manual satu per satu (mirip kondisi production, tapi di mesin lokal/single server).
+
+### 1. Siapkan `.env` di Root
+
+```bash
+cp .env.example .env
+```
+Isi semua nilai sesuai instruksi di [Setup Environment](#setup-environment-env). **Jangan biarkan nilai placeholder `ganti_dengan_...`.**
+
+### 2. Build & Jalankan
+
+```bash
+docker-compose up --build -d
+```
+
+Ini akan menjalankan 9 service: `mysql`, `rabbitmq`, `mosquitto`, `oauth-server`, `backend`, `python-ml`, `express-gateway`, `prometheus`, `grafana`.
+
+### 3. Migrasi & Seed Database
+
+```bash
+docker exec trashtrack-backend php artisan migrate --force
+docker exec trashtrack-backend php artisan db:seed
+```
+
+### 4. Verifikasi
+
+```bash
+curl http://localhost:3000/health
+```
+
+### 5. Perintah Berguna
+
+```bash
+docker-compose logs -f backend        # lihat log salah satu service
+docker-compose ps                     # status semua container
+docker-compose down                   # stop semua service
+docker-compose down -v                # stop + hapus volume (reset data!)
+```
+
+> **Catatan:** `docker-compose.dev.yml` saat ini masih kosong di repo. Jika ingin override khusus development (misal mount volume source code untuk hot-reload), isi file ini dan jalankan dengan:
+> ```bash
+> docker-compose -f docker-compose.yml -f docker-compose.dev.yml up --build
+> ```
+
+## Cara Jalankan di Server (Kubernetes)
+
+Untuk deployment production di server/cluster (VPS dengan k3s, atau cloud managed Kubernetes seperti GKE/EKS/DOKS). Manifest sudah disiapkan di folder `k8s/`.
+
+### 1. Build & Push Image ke Registry
+
+Setiap deployment k8s mereferensikan image `smart-city-platform-kel6-<service>:latest`. Build dan push image dulu ke registry yang bisa dijangkau cluster (Docker Hub, GHCR, dll):
+
+```bash
+docker build -t <registry>/smart-city-platform-kel6-backend:latest ./backend
+docker build -t <registry>/smart-city-platform-kel6-express-gateway:latest ./express-gateway
+docker build -t <registry>/smart-city-platform-kel6-oauth-server:latest ./oauth-server
+docker build -t <registry>/smart-city-platform-kel6-python-ml:latest ./python-ml-service
+
+docker push <registry>/smart-city-platform-kel6-backend:latest
+docker push <registry>/smart-city-platform-kel6-express-gateway:latest
+docker push <registry>/smart-city-platform-kel6-oauth-server:latest
+docker push <registry>/smart-city-platform-kel6-python-ml:latest
+```
+
+Lalu update field `image:` di setiap file `k8s/*-deployment.yaml` agar sesuai dengan `<registry>/...` yang baru di-push (saat ini masih menunjuk ke image lokal `imagePullPolicy: IfNotPresent`).
+
+### 2. Siapkan Secret
+
+**Jangan pakai `k8s/secrets.yaml` apa adanya** — file itu hanya contoh/demo dan sudah berisi nilai bawaan repo. Buat secret sendiri dari `k8s/secrets.example.yaml` sebagai acuan, isi dengan password yang kuat, lalu apply manual (bukan lewat git):
+
+```bash
+kubectl create namespace trashtrack
+
+kubectl create secret generic trashtrack-secrets \
+  --namespace trashtrack \
+  --from-literal=JWT_SECRET='ganti_dengan_secret_kuat_min_32_karakter' \
+  --from-literal=APP_KEY="base64:$(openssl rand -base64 32)" \
+  --from-literal=DB_USERNAME='root' \
+  --from-literal=DB_PASSWORD='ganti_dengan_password_kuat' \
+  --from-literal=MYSQL_ROOT_PASSWORD='ganti_dengan_password_kuat' \
+  --from-literal=RABBITMQ_USER='trashtrack' \
+  --from-literal=RABBITMQ_PASS='ganti_dengan_password_kuat'
+```
+
+> Alternatif yang lebih aman untuk tim: gunakan **Sealed Secrets** atau **Vault** alih-alih menyimpan secret mentah di file manifest.
+
+### 3. Apply Manifest Secara Berurutan
+
+```bash
+kubectl apply -f k8s/namespace.yaml
+kubectl apply -f k8s/configmap.yaml
+# (secret sudah dibuat manual di langkah 2 — skip k8s/secrets.yaml)
+kubectl apply -f k8s/mysql-statefulset.yaml
+kubectl apply -f k8s/rabbitmq-deployment.yaml
+
+# Tunggu MySQL & RabbitMQ ready dulu
+kubectl get pods -n trashtrack -w
+
+kubectl apply -f k8s/oauth-deployment.yaml
+kubectl apply -f k8s/python-ml-deployment.yaml
+kubectl apply -f k8s/backend-deployment.yaml
+kubectl apply -f k8s/gateway-deployment.yaml
+kubectl apply -f k8s/ingress.yaml
+```
+
+### 4. Install Metrics Server (untuk HPA)
+
+HPA (`k8s/hpa.yaml`) butuh `metrics-server` agar bisa membaca penggunaan CPU/memori pod:
+
+```bash
+kubectl apply -f https://github.com/kubernetes-sigs/metrics-server/releases/latest/download/components.yaml
+kubectl apply -f k8s/hpa.yaml
+
+# Verifikasi
+kubectl top pods -n trashtrack
+```
+
+### 5. Konfigurasi Ingress
+
+Edit `k8s/ingress.yaml`, ganti host sesuai domain atau IP server kalian. Jika belum punya domain dan deploy di VPS dengan IP publik, bisa pakai layanan `nip.io`:
+```yaml
+- host: trashtrack.<IP_SERVER_KALIAN>.nip.io
+```
+Pastikan **nginx ingress controller** sudah terpasang di cluster. Untuk TLS otomatis, install `cert-manager` lalu aktifkan baris `cert-manager.io/cluster-issuer` dan blok `tls:` yang sudah disiapkan (saat ini di-comment).
+
+### 6. Verifikasi Deployment
+
+```bash
+kubectl get all -n trashtrack
+kubectl logs -n trashtrack deployment/backend
+curl http://trashtrack.<domain-atau-ip>.nip.io/health
+```
+
+### 7. Update / Rollout Versi Baru
+
+```bash
+docker build -t <registry>/smart-city-platform-kel6-backend:latest ./backend
+docker push <registry>/smart-city-platform-kel6-backend:latest
+kubectl rollout restart deployment/backend -n trashtrack
+kubectl rollout status deployment/backend -n trashtrack
+```
+
+## Setup IoT (Opsional)
+
+Untuk uji coba alur end-to-end dari sensor hingga backend.
 
 ### Opsi A: Python Simulator
 
 ```bash
 cd iot
 python -m venv venv
-venv\Scripts\activate
+venv\Scripts\activate          # Windows, atau: source venv/bin/activate (Linux/Mac)
 pip install paho-mqtt python-dotenv
 cp .env.example .env
 ```
@@ -197,8 +472,7 @@ MQTT_USERNAME=iot_device
 MQTT_PASSWORD=trashtrack123
 ```
 
-> Butuh Mosquitto broker lokal untuk opsi ini. Jalankan:
-> `docker run -d --name trashtrack-mosquitto -p 1883:1883 eclipse-mosquitto:2.0`
+> Butuh broker Mosquitto lokal: `docker run -d --name trashtrack-mosquitto -p 1883:1883 eclipse-mosquitto:2.0`
 
 ```bash
 python simulator.py
@@ -207,18 +481,15 @@ python simulator.py
 ### Opsi B: PlatformIO + Wokwi (ESP32 Virtual)
 
 ```bash
-cd "IOT Device"
+cd IOT-Device
 pio run
 ```
+Lalu di VS Code: `F1` → `Wokwi: Start Simulator`. ESP32 akan publish data ke `broker.hivemq.com` (publik, tanpa auth).
 
-Lalu di VS Code: `F1` > `Wokwi: Start Simulator`
-
-ESP32 akan publish ke `broker.hivemq.com` (publik, tanpa auth).
-
-### Setup Node-RED (Bridge IoT ke Backend)
+### Setup Node-RED (Bridge IoT → Backend)
 
 ```bash
-cd "IOT Device/node-red-data"
+cd IOT-Device/node-red-data
 cp .env.example .env
 ```
 
@@ -233,7 +504,6 @@ OAUTH_CLIENT_SECRET=iot-secret
 ```bash
 npx node-red -s settings.js
 ```
-
 Buka `http://localhost:1880` — flow sudah ter-load otomatis.
 
 ## Data Flow End-to-End
@@ -310,65 +580,34 @@ Buka `http://localhost:1880` — flow sudah ter-load otomatis.
 
 | Method | Path | Deskripsi |
 |--------|------|-----------|
-| GET | `/health` | Status semua upstream services |
+| GET | `/health` | Status semua upstream service |
 | GET | `/iot/status` | Status IoT gateway |
 
 ## Testing dengan Postman
 
-### Setup Postman
-
-1. Buka Postman
-2. **Import** > pilih `postman/smartcity-postman-collection.json`
-3. **Import** > pilih `postman/smart-city-postman-environtment.json`
-4. Klik dropdown environment (kanan atas) > pilih **"Smart City - Local"**
-
-### Urutan Test
-
-Jalankan request **dari atas ke bawah** sesuai folder di collection:
-
-| Urutan | Folder | Request | Expected |
-|--------|--------|---------|----------|
-| 1 | 0. Health Check | Gateway Health | `"gateway": "ok"` |
-| 2 | 0. Health Check | OAuth Health | `"oauth-server"` |
-| 3 | 0. Health Check | ML Health | `models_loaded: 3` |
-| 4 | 1. OAuth | Login Admin | `accessToken` otomatis tersimpan di environment |
-| 5 | 1. OAuth | IoT Token | `iotToken` otomatis tersimpan |
-| 6 | 2. Smart Bin | List All Bins | 10 bins (`BIN-Z1-01` ~ `BIN-Z10-01`) |
-| 7 | 2. Smart Bin | Detail Bin (id=1) | `bin_code: "BIN-Z1-01"` |
-| 8 | 2. Smart Bin | Set Bin Maintenance | `status: "Maintenance"` |
-| 9 | 3. IoT Telemetry | Telemetry Normal | `201`, tinggi update, `dispatch: null` |
-| 10 | 3. IoT Telemetry | Telemetry Critical | `201`, `dispatch.truck` terisi (auto-dispatch!) |
-| 11 | 3. IoT Telemetry | Tanpa Token | `401` |
-| 12 | 4. ML Predictions | Fill Rate | `hours_until_full` angka |
-| 13 | 4. ML Predictions | Priority | `"Urgent"` |
-| 14 | 4. ML Predictions | Anomaly | `is_anomaly: true` |
-| 15 | 5. Fleet | List Trucks | truk `"On-Route"` terlihat |
-| 16 | 5. Fleet | Complete Schedule | truk kembali `"Available"`, volume bin reset ke 0 |
-| 17 | 6. Citizen Report | Submit Report | `201` (pilih file foto JPG/PNG di field `photo`) |
-| 18 | 6. Citizen Report | Verify Report | `"Reviewed"` |
-| 19 | 6. Citizen Report | Dispatch Truck | `"Dispatched"` + truk assigned |
-
-> Token, schedule ID, dan report ID **otomatis tersimpan** ke environment variable oleh test script — tidak perlu copy-paste manual.
+1. Buka Postman.
+2. **Import** → pilih `postman/smartcity-postman-collection.json`.
+3. **Import** → pilih `postman/smart-city-postman-environtment.json`.
+4. Pilih environment **"Smart City - Local"** di dropdown kanan atas.
+5. Jalankan request **dari atas ke bawah** sesuai urutan folder (Health Check → OAuth → Smart Bin → IoT Telemetry → ML Predictions → Fleet → Citizen Report). Token, schedule ID, dan report ID otomatis tersimpan ke variabel environment oleh test script.
 
 ### Test End-to-End dengan Wokwi (IoT → Backend → ML)
 
-1. Pastikan semua 5 service + Node-RED sudah running
-2. Buka VS Code > folder `IOT Device` > `F1` > `Wokwi: Start Simulator`
-3. Tunggu 5 detik — data mulai publish ke HiveMQ → Node-RED → Gateway → Backend
-4. Lihat terminal Backend — muncul log `POST /api/iot/telemetry ... 201`
-5. Di Postman, jalankan `List All Bins` — cek `BIN-Z5-01` data berubah (volume, tinggi, temperature)
+1. Pastikan semua 5 service + Node-RED sudah running.
+2. Buka VS Code → folder `IOT-Device` → `F1` → `Wokwi: Start Simulator`.
+3. Tunggu beberapa detik — data mulai publish ke HiveMQ → Node-RED → Gateway → Backend.
+4. Lihat terminal Backend — muncul log `POST /api/iot/telemetry ... 201`.
+5. Di Postman, jalankan `List All Bins` — cek data salah satu bin berubah (volume, tinggi, temperature).
 
-## Docker Compose (Full Stack)
+## Monitoring
 
-Untuk jalankan semua service sekaligus tanpa setup manual:
+Saat berjalan via Docker Compose atau Kubernetes, Prometheus & Grafana sudah otomatis terkonfigurasi:
 
-```bash
-docker-compose up --build -d
-docker exec trashtrack-backend php artisan db:seed
-curl http://localhost:3000/health
-```
+- Prometheus: `http://localhost:9090`
+- Grafana: `http://localhost:3001` (login: `admin` / nilai `GRAFANA_PASSWORD` di `.env`)
+- Dashboard utama sudah di-provision otomatis dari `monitoring/grafana-dashboard.json`.
 
-## Akun Default
+## Akun & Kredensial Default
 
 | Username | Password | Role | Untuk |
 |----------|----------|------|-------|
@@ -380,65 +619,4 @@ curl http://localhost:3000/health
 | `smartcity-app` | `smartcity-secret` | password, client_credentials, refresh_token |
 | `iot-device` | `iot-secret` | client_credentials |
 
-## Struktur Folder
-
-```
-smart-city/
-├── backend/                  # Laravel 12 API (PHP 8.2)
-│   ├── app/
-│   │   ├── Http/Controllers/ # SmartBin, Fleet, CitizenReport
-│   │   ├── Models/           # TrashBin, SensorLog, Truck, Schedule, SanitationReport
-│   │   ├── Services/         # RabbitMQPublisher, MLClient
-│   │   └── Http/Requests/    # Form validation
-│   ├── database/migrations/  # Schema definitions
-│   ├── database/seeders/     # Sample data (10 bins, 10 trucks, etc)
-│   └── routes/api.php        # API routes
-│
-├── express-gateway/          # API Gateway (Node.js)
-│   └── src/
-│       ├── middleware/        # JWT, rate limiting, logger
-│       └── routes/            # proxy, health, iot, metrics
-│
-├── oauth-server/             # OAuth 2.0 Server (Node.js)
-│   └── src/
-│       ├── routes/oauth.js   # token, introspect, revoke
-│       └── models/tokenStore.js
-│
-├── python-ml-service/        # ML Prediction Service (FastAPI)
-│   ├── main.py               # API endpoints
-│   ├── train_fill_rate.py    # Model 1: RandomForest regression
-│   ├── train_priority_route.py # Model 2: GradientBoosting classification
-│   ├── train_anomaly.py      # Model 3: RandomForest classification
-│   ├── generate_data.py      # Synthetic training data generator
-│   └── models/               # Trained .pkl files
-│
-├── IOT Device/               # PlatformIO ESP32 project
-│   ├── src/main.cpp          # ESP32 firmware
-│   ├── diagram.json          # Wokwi circuit (HC-SR04 + MQ-2 + LED)
-│   ├── platformio.ini        # PlatformIO config
-│   └── node-red-data/        # Node-RED flows + functions
-│
-├── iot/                      # Python MQTT simulator
-│   ├── simulator.py          # Simulate 4 zones, 30s interval
-│   └── mosquitto.conf        # MQTT broker config
-│
-├── docker-compose.yml        # Full stack (7 services)
-├── database/                 # Raw SQL schema + seed
-└── postman/                  # API collection + environment
-```
-
-## Tech Stack
-
-| Layer | Teknologi |
-|-------|-----------|
-| IoT Device | ESP32, HC-SR04 (ultrasonik), MQ-2 (gas), PlatformIO |
-| IoT Simulator | Python, paho-mqtt |
-| MQTT Broker | Eclipse Mosquitto 2.0, HiveMQ (publik) |
-| IoT Bridge | Node-RED |
-| API Gateway | Express.js, JWT, rate limiting, http-proxy-middleware |
-| Auth | OAuth 2.0 (password, client_credentials, refresh_token), bcrypt |
-| Backend | Laravel 12, PHP 8.2, Eloquent ORM |
-| ML | FastAPI, scikit-learn (RandomForest, GradientBoosting) |
-| Database | MySQL 8.0 |
-| Message Broker | RabbitMQ 3.12 (topic exchange) |
-| Container | Docker, Docker Compose |
+> Kredensial ini hanya untuk demo/lokal. **Wajib diganti** sebelum digunakan di server production.
