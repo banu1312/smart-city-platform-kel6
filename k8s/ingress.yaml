@@ -22,10 +22,9 @@ spec:
     # Ganti host di bawah dengan domain/IP server kalian
     # Kalau pakai IP langsung (VPS): bisa pakai nip.io
     # contoh: 103.147.92.134.nip.io
-    - host: trashtrack.103.147.92.134.nip.io
+    - host: trashtrack.103.143.12.197.nip.io
       http:
         paths:
-          # Semua request masuk ke gateway (single entry point)
           - path: /
             pathType: Prefix
             backend:

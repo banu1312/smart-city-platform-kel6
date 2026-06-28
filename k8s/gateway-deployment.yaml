@@ -85,10 +85,11 @@ metadata:
   labels:
     app: gateway
 spec:
-  type: ClusterIP
+  type: NodePort
   selector:
     app: gateway
   ports:
     - port: 3000
       targetPort: 3000
+      nodePort: 30000
       name: http
