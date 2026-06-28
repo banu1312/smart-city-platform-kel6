@@ -9,9 +9,7 @@ spec:
   resources:
     requests:
       storage: 5Gi
-  # Kalau pakai cloud (GKE/DO/EKS) bisa tambahkan storageClassName
-  # storageClassName: standard
- 
+
 ---
 apiVersion: apps/v1
 kind: StatefulSet
@@ -34,6 +32,10 @@ spec:
       containers:
         - name: mysql
           image: mysql:8.0
+          args:
+            - "--innodb-buffer-pool-size=128M"
+            - "--performance-schema=OFF"
+            - "--max-connections=50"
           ports:
             - containerPort: 3306
               name: mysql
@@ -53,10 +55,10 @@ spec:
               mountPath: /var/lib/mysql
           resources:
             requests:
-              memory: "256Mi"
+              memory: "384Mi"
               cpu: "250m"
             limits:
-              memory: "512Mi"
+              memory: "768Mi"
               cpu: "500m"
           livenessProbe:
             exec:
@@ -64,8 +66,8 @@ spec:
                 - sh
                 - -c
                 - mysqladmin ping -h localhost -u root -p$MYSQL_ROOT_PASSWORD
-            initialDelaySeconds: 30
-            periodSeconds: 10
+            initialDelaySeconds: 60
+            periodSeconds: 15
             timeoutSeconds: 5
             failureThreshold: 10
           readinessProbe:
@@ -74,15 +76,15 @@ spec:
                 - sh
                 - -c
                 - mysqladmin ping -h localhost -u root -p$MYSQL_ROOT_PASSWORD
-            initialDelaySeconds: 20
-            periodSeconds: 5
-            timeoutSeconds: 3
+            initialDelaySeconds: 45
+            periodSeconds: 10
+            timeoutSeconds: 5
             failureThreshold: 10
       volumes:
         - name: mysql-storage
           persistentVolumeClaim:
             claimName: mysql-pvc
- 
+
 ---
 apiVersion: v1
 kind: Service
