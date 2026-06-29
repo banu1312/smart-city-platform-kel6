@@ -5,7 +5,7 @@ const rateLimit = require("express-rate-limit");
 // Limit: 100 request per 15 menit per IP
 const globalLimiter = rateLimit({
 	windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS) || 15 * 60 * 1000,
-	max: parseInt(process.env.RATE_LIMIT_MAX) || 100,
+	max: parseInt(process.env.RATE_LIMIT_MAX) || 60 * 15,
 	standardHeaders: true, // kirim header RateLimit-* standar RFC
 	legacyHeaders: false, // nonaktifkan header X-RateLimit-* lama
 	keyGenerator: (req) => {
